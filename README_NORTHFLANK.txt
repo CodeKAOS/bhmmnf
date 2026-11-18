@@ -1,4 +1,4 @@
-BITCOIN HERO v23 — NORTHFLANK DEPLOYMENT
+BITCOIN HERO v24 — NORTHFLANK DEPLOYMENT
 
 Package contents:
 - server.py: authenticated Python backend, 3-second server-side price collector, SQLite records/history, analytics and API proxy routes.
@@ -13,7 +13,7 @@ Deploy:
 5. Keep the existing Northflank service URL and HTTPS configuration.
 
 v23 features:
-- Main Market page: eight coin cards, independent LIVE/15M/1H/1D/ALL chart controls, live activity, market alerts and market history.
+- Main Market page: eight coin cards, independent LIVE/5M/15M/1H/1 DAY/ALL TIME chart controls, live activity, market alerts and market history.
 - Market Intelligence page: 5m/15m/1h/24h changes, trend, volatility, 0-100 score, high/low distance and proportional treemap heatmap.
 - Opportunity Scanner page: score-ranked candidates and proximity-to-high breakout watch.
 - Leaderboards page: Monthly and All Time subtabs.
@@ -40,3 +40,10 @@ V24 PLAYER PROFILE FIX
 - Uses the public profile's actual `level` object, `curve`, `recent`, `closed`, `wins`, `trades`, `best`, `month`, `netWorth`, `startCash`, `rank`, and `createdAt` fields.
 - Does not call the authenticated /api/users/{id}/achievements endpoint for public profiles.
 - Does not invent unlock dates.
+
+
+V24 GRAPH RESTORATION
+- Restores the individual price graph and timeframe controls inside every coin card (BTC, ETH, SOL, DOGE, XRP, ADA, LINK and AVAX).
+- Each coin has independent LIVE (rolling 5-minute), 5M, 15M, 1H, 1 DAY and ALL TIME selections.
+- Graph history refreshes alongside the 3-second live dashboard poll; changing one coin's timeframe does not change another coin's selection.
+- Backend history supports the 5M and 15M range parameters. ALL TIME reads retained hourly candles from the existing SQLite database.

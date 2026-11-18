@@ -134,7 +134,7 @@ def latest_state():
 
 def history(symbol, rng):
     now=int(time.time()*1000)
-    cuts={'live':now-5*60_000,'1h':now-60*60_000,'4h':now-4*60*60_000,'1d':now-24*60*60_000,'all':0}
+    cuts={'live':now-5*60_000,'5m':now-5*60_000,'15m':now-15*60_000,'1h':now-60*60_000,'4h':now-4*60*60_000,'1d':now-24*60*60_000,'all':0}
     if rng=='all':
         with con() as c:
             rows=c.execute('SELECT bucket_ts,open,high,low,close FROM candles WHERE symbol=? AND interval_ms=3600000 ORDER BY bucket_ts',(symbol,)).fetchall()
@@ -147,7 +147,7 @@ def history(symbol, rng):
     with con() as c:
         rows=c.execute('SELECT bucket_ts,open,high,low,close FROM candles WHERE symbol=? AND interval_ms=60000 AND bucket_ts>=? ORDER BY bucket_ts',(symbol,cut)).fetchall()
     rows=[dict(r) for r in rows]
-    interval={'live':60000,'1h':60000,'4h':300000,'1d':900000}[rng]
+    interval={'live':60000,'5m':60000,'15m':60000,'1h':60000,'4h':300000,'1d':900000}[rng]
     candles=aggregate_candles(rows,interval)
     # The live/short views remain bounded. Long-term ALL history is one saved candle per hour.
     return {'candles':candles,'points':[]}
@@ -336,7 +336,7 @@ class Handler(SimpleHTTPRequestHandler):
         if u.path=='/api/state': return self.send_json(latest_state())
         if u.path=='/api/history':
             q=parse_qs(u.query); s=(q.get('symbol') or [''])[0].upper(); rng=(q.get('range') or ['live'])[0]
-            if s not in SYMS or rng not in ('live','1h','4h','1d','all'): return self.send_json({'error':'bad parameters'},400)
+            if s not in SYMS or rng not in ('live','5m','15m','1h','4h','1d','all'): return self.send_json({'error':'bad parameters'},400)
             return self.send_json({'symbol':s,'range':rng,**history(s,rng)})
         if u.path=='/api/export.csv':
             body=csv_bytes(); self.send_response(200); self.send_header('Content-Type','text/csv'); self.send_header('Content-Disposition','attachment; filename="bitcoin-hero-cloud-snapshot.csv"'); self.send_header('Content-Length',str(len(body))); self.send_header('Cache-Control','no-store'); self.end_headers(); return self.wfile.write(body)
