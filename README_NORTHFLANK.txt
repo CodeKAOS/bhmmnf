@@ -1,33 +1,33 @@
-BITCOIN HERO TRACKER v22 — NORTHFLANK DEPLOYMENT
+BITCOIN HERO v23 — NORTHFLANK DEPLOYMENT
 
-Contents
-- server.py: authenticated Python HTTP server, 3-second server-side price collector, SQLite persistence, analytics and API proxy routes.
-- tracker.html: v22 dashboard with all eight coins, market analytics, heatmap, scanner, live activity, monthly/all-time leaderboards and player profiles.
+Package contents:
+- server.py: authenticated Python backend, 3-second server-side price collector, SQLite records/history, analytics and API proxy routes.
+- tracker.html: single-page dashboard with Market, Market Intelligence, Opportunity Scanner and Leaderboards tabs.
 - Dockerfile / requirements.txt: container deployment files.
 
-Deploy
-1. Create/update the Northflank service from this ZIP or its repository.
-2. Expose HTTP port 8000.
-3. Attach a persistent volume mounted at /data. Do not remove or replace the existing volume: it contains bitcoin_hero.sqlite3 and protected historical records.
-4. Set TRACKER_USERNAME and TRACKER_PASSWORD to your login credentials.
-5. Optional: set BITCOIN_HERO_API to the price endpoint (default https://bitcoinhero.me/api/prices).
-6. Optional: set BITCOIN_HERO_API_ROOT (default https://bitcoinhero.me/api) if the public API root changes.
-7. Deploy and sign in.
+Deploy:
+1. Replace the application files with this package and deploy the Dockerfile.
+2. Attach the existing persistent volume at /data. Do not detach or delete the existing volume.
+3. Preserve TRACKER_USERNAME and TRACKER_PASSWORD environment variables.
+4. Set PORT=8000 and DATA_DIR=/data (the Dockerfile defaults these).
+5. Keep the existing Northflank service URL and HTTPS configuration.
 
-New authenticated endpoints
-- GET /api/analytics — 5m, 15m, 1h and 24h returns, trend, rolling volatility, reversal heuristic, distance from protected records and 0–100 heuristic score.
-- GET /api/activity — proxies /api/activity.
-- GET /api/leaderboard/month — proxies /api/leaderboard?period=month.
-- GET /api/leaderboard/all — proxies /api/leaderboard?period=all.
-- GET /api/players/{username} — proxies the URL-encoded player name.
+v23 features:
+- Main Market page: eight coin cards, independent LIVE/15M/1H/1D/ALL chart controls, live activity, market alerts and market history.
+- Market Intelligence page: 5m/15m/1h/24h changes, trend, volatility, 0-100 score, high/low distance and proportional treemap heatmap.
+- Opportunity Scanner page: score-ranked candidates and proximity-to-high breakout watch.
+- Leaderboards page: Monthly and All Time subtabs.
+- Player profiles opened from activity/leaderboards; profile statistics, history and achievements render when supplied by the player API.
+- Player avatar proxy uses player ID and the supplied avatar endpoint; initials are fallback.
 
-Data safety
-- Existing SQLite tables and records are retained; the server adds no destructive migration.
-- Protected historical lows/highs continue to be updated only by the existing collector and CSV merge rules. Analytics are calculated separately from raw price observations.
-- Server-side polling continues when the browser is closed, provided the Northflank service remains running.
-- Keep the /data persistent volume attached across redeployments.
+External API routes are proxied server-side:
+  /api/activity
+  /api/leaderboard?period=month|all
+  /api/player?username=...
+  /api/avatar/{playerid}
 
-Notes
-- Leaderboard/activity/profile JSON is rendered defensively across common response shapes. If the upstream API uses different field names or nested shapes, the layout may need a small mapping adjustment after inspecting live responses.
-- Signal score, trend, reversal and opportunity scanner are heuristic indicators, not financial advice or trading instructions.
-- This build restores the supplied server.py backend alongside the uploaded v21 ZIP, whose archive did not contain server.py even though its Dockerfile required it.
+Important:
+- Existing SQLite data is stored in /data/bitcoin_hero.sqlite3. Keep the same persistent /data volume to preserve high/low records and stored price history.
+- Analytics use available stored price observations. Short-period changes and volatility become more meaningful as observations accumulate.
+- External API payload structures may vary. The frontend supports common array/object field shapes, but confirm activity, leaderboard and player fields against the live API after deployment.
+- This ZIP is not deployed automatically.
