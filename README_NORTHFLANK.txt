@@ -47,3 +47,5 @@ V24 GRAPH RESTORATION
 - Each coin has independent LIVE (rolling 5-minute), 5M, 15M, 1H, 1 DAY and ALL TIME selections.
 - Graph history refreshes alongside the 3-second live dashboard poll; changing one coin's timeframe does not change another coin's selection.
 - Backend history supports the 5M and 15M range parameters. ALL TIME reads retained hourly candles from the existing SQLite database.
+
+UI layout correction: all eight coin cards display compact individual charts and their own LIVE, 5M, 15M, 1H, 1 DAY and ALL TIME controls. Selecting a coin no longer expands its chart or hides the other cards' controls.
