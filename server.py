@@ -5,7 +5,7 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 from urllib.request import Request, urlopen
 
-REMOTE=os.getenv('BITCOIN_HERO_API','https://bitcoinhero.me/api/prices')
+REMOTE=os.getenv('BITCOIN_HERO_API','https://api.bitcoinhero.me/api/prices')
 PORT=int(os.getenv('PORT','8000')); HOST=os.getenv('HOST','0.0.0.0')
 AUTH_USER=os.getenv('TRACKER_USERNAME','admin')
 AUTH_PASS=os.getenv('TRACKER_PASSWORD','')
@@ -221,97 +221,8 @@ def period_change(c, symbol, now, ms, latest):
     if not row or not row['price']: return 0.0
     return (float(latest)/float(row['price'])-1)*100
 
-def intelligence():
-    now=int(time.time()*1000); result=[]
-    with con() as c:
-        for sym in SYMS:
-            latest=c.execute('SELECT ts,price FROM prices WHERE symbol=? ORDER BY ts DESC LIMIT 1',(sym,)).fetchone()
-            rec=c.execute('SELECT low,high FROM records WHERE symbol=?',(sym,)).fetchone()
-            if not latest or not latest['price']: continue
-            price=float(latest['price'])
-            m5=period_change(c,sym,now,5*60_000,price); m15=period_change(c,sym,now,15*60_000,price)
-            h1=period_change(c,sym,now,60*60_000,price); h24=period_change(c,sym,now,24*60*60_000,price)
-            rows=c.execute('SELECT price FROM prices WHERE symbol=? AND ts>=? ORDER BY ts',(sym,now-24*60*60_000)).fetchall()
-            vals=[float(x['price']) for x in rows if x['price']]
-            returns=[(vals[i]/vals[i-1]-1)*100 for i in range(1,len(vals)) if vals[i-1]]
-            vol=(sum(v*v for v in returns)/max(1,len(returns)))**.5 if returns else 0.0
-            trend='UP' if (m15+h1+h24)>0 else 'DOWN'
-            score=max(0,min(100,round(50+min(25,max(-25,h24*1.2))+min(15,max(-15,m15*2))+(8 if trend=='UP' else -8)-min(15,vol*12))))
-            high=float(rec['high']) if rec and rec['high'] else price; low=float(rec['low']) if rec and rec['low'] else price
-            result.append({'symbol':sym,'m5':m5,'m15':m15,'h1':h1,'h24':h24,'trend':trend,'volatility':vol,'score':score,'highDistance':(high-price)/price*100 if price else 0,'lowDistance':(price-low)/low*100 if low else 0})
-    return {'updatedAt':now,'coins':result}
-
-def trade_assistant():
-    """Conservative, transparent analysis of observed prices; never executes trades."""
-    now=int(time.time()*1000)
-    output=[]
-    with con() as c:
-        for sym in SYMS:
-            rows=c.execute('SELECT ts,price FROM prices WHERE symbol=? AND ts>=? ORDER BY ts',
-                           (sym,now-24*60*60_000)).fetchall()
-            points=[(int(r['ts']),float(r['price'])) for r in rows if r['price'] and r['price']>0]
-            if not points:
-                output.append({'symbol':sym,'action':'WAIT','score':0,'reasons':['No stored price samples yet']})
-                continue
-            price=points[-1][1]
-            span=points[-1][0]-points[0][0]
-            recent=[v for t,v in points if t>=now-60*60_000]
-            high=max(recent) if recent else price
-            low=min(recent) if recent else price
-            m5=period_change(c,sym,now,5*60_000,price) if span>=5*60_000 else None
-            m15=period_change(c,sym,now,15*60_000,price) if span>=15*60_000 else None
-            h1=period_change(c,sym,now,60*60_000,price) if span>=60*60_000 else None
-            m24=period_change(c,sym,now,24*60*60_000,price) if span>=24*60*60_000 else None
-            # Use 1-minute samples for volatility rather than 3-second ticks.
-            minute={}
-            for t,v in points:
-                if t>=now-60*60_000: minute[t//60_000]=v
-            series=list(minute.values())
-            returns=[(series[i]/series[i-1]-1)*100 for i in range(1,len(series)) if series[i-1]]
-            volatility=(sum(v*v for v in returns)/len(returns))**.5 if returns else None
-            enough=len(series)>=20 and span>=60*60_000 and h1 is not None and m15 is not None
-            action='WAIT'; score=0; entry_low=entry_high=target=stop=rr=None
-            reasons=[]
-            if not enough:
-                reasons.append('Need at least 1 hour of stored prices and 20 distinct minute samples')
-            elif high<=low:
-                reasons.append('Insufficient recent price range for support and resistance')
-            else:
-                aligned_up=m5 is not None and m5>0 and m15>0 and h1>0
-                aligned_down=m5 is not None and m5<0 and m15<0 and h1<0
-                width=high-low
-                score=max(0,min(100,round(45+min(22,abs(m15)*4)+min(18,abs(h1)*2)-min(25,(volatility or 0)*20))))
-                reasons.extend(['5m / 15m / 1h momentum '+('aligned upward' if aligned_up else 'aligned downward' if aligned_down else 'mixed'),
-                                '1h observed support '+format(low,'.6g')+'; resistance '+format(high,'.6g')])
-                if volatility is not None and volatility>2:
-                    reasons.append('Elevated minute-to-minute volatility: wait')
-                elif aligned_up and price<=high and (high-price)/price>=0.002:
-                    action='UP SETUP'
-                    entry_low=price*0.998;entry_high=price*1.002
-                    stop=low;target=high
-                    risk=price-stop;reward=target-price
-                    rr=reward/risk if risk>0 else None
-                elif aligned_down and price>=low and (price-low)/price>=0.002:
-                    action='DOWN SETUP'
-                    entry_low=price*0.998;entry_high=price*1.002
-                    stop=high;target=low
-                    risk=stop-price;reward=price-target
-                    rr=reward/risk if risk>0 else None
-                if action!='WAIT' and (rr is None or rr<1.5):
-                    action='WAIT';entry_low=entry_high=target=stop=rr=None
-                    reasons.append('Risk/reward below 1.5:1')
-                if action=='WAIT' and len(reasons)<3:
-                    reasons.append('No qualifying setup at the current price')
-            output.append({'symbol':sym,'price':price,'action':action,'score':score,
-                           'entryLow':round(entry_low,8) if entry_low is not None else None,
-                           'entryHigh':round(entry_high,8) if entry_high is not None else None,
-                           'target':target,'stop':stop,'riskReward':round(rr,2) if rr is not None else None,
-                           'm24':m24,'reasons':reasons})
-    output.sort(key=lambda x:(x['action']=='WAIT',-x['score']))
-    return {'updatedAt':now,'coins':output}
-
 def external_json(url):
-    req=Request(url,headers={'User-Agent':'Mozilla/5.0 BitcoinHero/25','Accept':'application/json'})
+    req=Request(url,headers={'User-Agent':'Mozilla/5.0 BitcoinHero/26','Accept':'application/json'})
     with urlopen(req,timeout=12) as r:
         raw=r.read(3_000_000)
         return json.loads(raw.decode('utf-8'))
@@ -376,31 +287,24 @@ class Handler(SimpleHTTPRequestHandler):
         if u.path in ('/','/tracker.html'):
             self.path='/tracker.html'; return super().do_GET()
         if not self.require_auth(): return
-
-        if u.path=='/api/trade-assistant':
-            try: return self.send_json(trade_assistant())
-            except Exception as e: return self.send_json({'error':str(e)},500)
-        if u.path=='/api/intelligence':
-            try: return self.send_json(intelligence())
-            except Exception as e: return self.send_json({'error':str(e)},500)
         if u.path=='/api/activity':
-            try: return self.send_json(external_json('https://bitcoinhero.me/api/activity'))
+            try: return self.send_json(external_json('https://api.bitcoinhero.me/api/activity'))
             except Exception as e: return self.send_json({'error':'Activity service unavailable','detail':str(e)},502)
         if u.path=='/api/leaderboard':
             period=(parse_qs(u.query).get('period') or ['month'])[0]
             if period not in ('month','all'): return self.send_json({'error':'period must be month or all'},400)
-            try: return self.send_json(external_json('https://bitcoinhero.me/api/leaderboard?period='+period))
+            try: return self.send_json(external_json('https://api.bitcoinhero.me/api/leaderboard?period='+period))
             except Exception as e: return self.send_json({'error':'Leaderboard service unavailable','detail':str(e)},502)
         if u.path=='/api/player':
             q=parse_qs(u.query); username=(q.get('username') or [''])[0]
             if not username: return self.send_json({'error':'username required'},400)
-            try: return self.send_json(external_json('https://bitcoinhero.me/api/players/'+quote(username,safe='')))
+            try: return self.send_json(external_json('https://api.bitcoinhero.me/api/players/'+quote(username,safe='')))
             except Exception as e: return self.send_json({'error':'Player profile unavailable','detail':str(e)},502)
         if u.path.startswith('/api/avatar/'):
             player_id=u.path.rsplit('/',1)[-1]
             if not player_id or len(player_id)>160: return self.send_json({'error':'invalid player id'},400)
             try:
-                req=Request('https://bitcoinhero.me/api/users/'+quote(player_id,safe='')+'/avatar',headers={'User-Agent':'Mozilla/5.0 BitcoinHero/25'})
+                req=Request('https://api.bitcoinhero.me/api/users/'+quote(player_id,safe='')+'/avatar',headers={'User-Agent':'Mozilla/5.0 BitcoinHero/26'})
                 with urlopen(req,timeout=12) as r:
                     body=r.read(2_000_000); self.send_response(r.status); self.send_header('Content-Type',r.headers.get('Content-Type','image/png')); self.send_header('Cache-Control','public, max-age=300'); self.send_header('Content-Length',str(len(body))); self.end_headers(); return self.wfile.write(body)
             except Exception: return self.send_json({'error':'avatar unavailable'},404)

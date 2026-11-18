@@ -59,3 +59,15 @@ V25 changes:
 - Added Trade Opportunity Assistant: all eight coins ranked with conservative WAIT / UP SETUP / DOWN SETUP analysis, price-based levels, risk/reward and reasons. It uses observed stored prices; insufficient data produces WAIT. Not investment advice, not automatic trading.
 - Added authenticated GET /api/trade-assistant.
 - No database schema changes or data deletion. Keep the existing persistent /data volume.
+
+
+V26 changes:
+- Removed Trade Opportunity Assistant from the dashboard.
+- Removed Market Intelligence and Opportunity Scanner navigation/pages and their associated backend analysis endpoints.
+- Live Activity and Market Alerts panels are swapped: Market Alerts left, Live Activity right.
+- Live Activity uses the matching colored coin-card glyph and no longer shows the redundant trade metadata line.
+- Market Alerts use the matching colored coin-card glyph instead of ticker text.
+- Leaderboard Monthly and All Time tabs are centred. Both periods render a 1-2-3 podium followed by a descending ranked list.
+- Corrected the upstream production API host to https://api.bitcoinhero.me for prices, activity, leaderboards, player profiles and avatars.
+- Header tagline removed, connection status reads Connected, and logout is an icon-only button with an accessible label and tooltip.
+- Existing persistent SQLite data and schema are retained. Do not delete or recreate /data.

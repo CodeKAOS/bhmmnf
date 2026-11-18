@@ -114,30 +114,59 @@
 .assistant-note {font-size:11px;color:#95a8c2;margin-top:14px;line-height:1.6}
 @media(max-width:1100px){.assistant-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.assistant-grid{grid-template-columns:1fr}.cards .chartbox{height:90px!important}.home-grid{margin-top:24px}}
+
+/* v26 dashboard and leaderboard refinements */
+.home-grid{grid-template-columns:1fr 1fr;gap:16px}
+.home-grid .panel{min-width:0}
+.subtabs{display:flex;justify-content:center;align-items:center;gap:10px;margin:0 auto 18px;max-width:520px;width:100%}
+.subtabs .subtab{flex:1;text-align:center;min-width:0}
+.coinlogo{display:grid;place-items:center;flex:0 0 auto;width:36px;height:36px;border-radius:50%;font-weight:900;font-size:17px;line-height:1;color:#10141c}
+.coinlogo.btc{background:#f7931a;color:#241606}
+.coinlogo.eth{background:#6878d3;color:#fff}
+.coinlogo.sol{background:#101a2b;color:#54f3ce;border:1px solid #29354a}
+.coinlogo.doge{background:#c7a94a;color:#33270a}
+.coinlogo.xrp{background:#eef4fb;color:#17243a}
+.coinlogo.ada{background:#2860b2;color:#eaf3ff}
+.coinlogo.link{background:#2859df;color:#fff}
+.coinlogo.avax{background:#ef4148;color:#fff}
+.activity-row .coinlogo{width:34px;height:34px;font-size:16px}
+.feed-row .coinlogo{width:30px;height:30px;font-size:14px}
+.logout{width:40px;height:38px;display:grid;place-items:center;padding:0}
+#leaderboardList{gap:18px}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:clamp(12px,4vw,54px);padding:16px 8px 22px;min-height:190px}
+.podium-player{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;background:transparent;border:0;min-width:0;width:min(28%,150px);padding:0 4px;color:#f3f6fc}
+.podium-player:hover{background:transparent;border-color:transparent;transform:translateY(-2px)}
+.podium-avatar{display:grid;place-items:center;position:relative;border-radius:50%;border:2px solid #74839b;background:#202b3d;width:60px;height:60px;overflow:hidden}
+.podium-avatar img,.podium-avatar .coin-logo{width:100%!important;height:100%!important;object-fit:cover;border-radius:50%}
+.podium-player.rank-1 .podium-avatar{width:82px;height:82px;border-color:#f5c84b;box-shadow:0 0 22px #f5c84b30}
+.podium-player.rank-2 .podium-avatar{border-color:#aebbd0}
+.podium-player.rank-3 .podium-avatar{border-color:#d98a45}
+.podium-rank{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;margin-top:-17px;z-index:1;background:#dce6f3;color:#1b2638;font-size:11px;font-weight:950;border:2px solid #0d131d}
+.rank-1 .podium-rank{background:#f4ca48;color:#231b05}
+.rank-3 .podium-rank{background:#d88c4d;color:#261507}
+.podium-player strong{font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.podium-level{font-size:10px;color:#f5c84b}
+.podium-value{font-size:12px;color:#9db3d0;white-space:nowrap}
+.leaderboard-rest{display:flex;flex-direction:column;gap:0;border:1px solid #263143;border-radius:14px;overflow:hidden}
+.leaderboard-rest .leader-row{border:0;border-bottom:1px solid #263143;border-radius:0;background:#111720;padding:13px 18px;text-align:left;width:100%;color:#f3f6fc}
+.leaderboard-rest .leader-row:last-child{border-bottom:0}
+.leader-person{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.leader-person strong{font-size:13px}
+.leader-value{margin-left:auto;font-weight:900;white-space:nowrap}
+@media(max-width:760px){.home-grid{grid-template-columns:1fr}.podium{gap:8px}.podium-player{width:32%}.podium-player.rank-1 .podium-avatar{width:70px;height:70px}.podium-avatar{width:52px;height:52px}}
 </style></head><body><div id="loginScreen" class="login-screen"><form id="loginForm" class="login-card"><div class="login-brand"><div class="login-mark">₿</div><div><div class="login-title">Bitcoin Hero</div><div class="login-sub">Secure market monitor</div></div></div><label for="loginUser">Username</label><input id="loginUser" name="username" autocomplete="username" required autofocus><label for="loginPass">Password</label><div class="password-row"><input id="loginPass" name="password" type="password" autocomplete="current-password" required><button id="togglePassword" type="button">Show</button></div><button class="login-submit" type="submit">Sign in</button><div id="loginError" class="login-error" role="alert"></div><div class="login-hint">Sign in to view live prices and protected market records.</div></form></div><div id="dashboard" hidden><div class="wrap">
-<div class="top"><div class="brand"><div class="logo">B</div><div><div class="eyebrow">Live simulated market · Tracker v25</div><h1>Bitcoin Hero <span style="font-size:12px;vertical-align:middle;color:#f7931a;border:1px solid #68451f;border-radius:7px;padding:3px 6px;letter-spacing:.04em">v25</span></h1></div></div><div class="actions"><button id="importBtn">Import & Merge CSV</button><button id="csv">Export cloud CSV</button><button id="logoutBtn" class="logout">Log out</button><input id="importFile" type="file" accept=".csv,text/csv" hidden></div></div>
-<div class="statusbar"><div class="live"><span id="dot" class="dot off"></span><span id="status">Connecting…</span></div><div class="meta">Last update <b id="time">—</b></div><div class="meta">API tick <b id="tick">—</b></div><div class="meta">Session <b id="session">0 samples</b></div></div>
+<div class="top"><div class="brand"><div class="logo">B</div><div><h1>Bitcoin Hero </h1></div></div><div class="actions"><button id="importBtn">Import & Merge CSV</button><button id="csv">Export cloud CSV</button><button id="logoutBtn" class="logout" type="button" title="Log out" aria-label="Log out"><svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg></button><input id="importFile" type="file" accept=".csv,text/csv" hidden></div></div>
+<div class="statusbar"><div class="live"><span id="dot" class="dot off"></span><span id="status">Connected</span></div><div class="meta">Last update <b id="time">—</b></div><div class="meta">API tick <b id="tick">—</b></div><div class="meta">Session <b id="session">0 samples</b></div></div>
 <div class="mainnav" id="mainNav">
  <button class="navbtn active" data-page="home">Market</button>
- <button class="navbtn" data-page="intelligence">Market Intelligence</button>
- <button class="navbtn" data-page="scanner">Opportunity Scanner</button>
  <button class="navbtn" data-page="leaderboards">Leaderboards</button>
 </div>
 <div id="page-home" class="page active">
  <div id="cards" class="cards"></div>
- <section class="panel trade-assistant"><div class="sectionhead"><div><h2>TRADE OPPORTUNITY ASSISTANT</h2><p>Data-based setups across all eight coins · not a profit guarantee</p></div><span class="liveflag">● LIVE ANALYSIS</span></div><div id="tradeAssistant" class="assistant-grid"><div class="empty">Collecting market information…</div></div><div class="assistant-note">Signals use stored market prices, recent trend, volatility and local support/resistance. Entry zones, targets and stops are illustrative analytical levels, not execution instructions. WAIT means there is insufficient evidence for a defensible setup. No trades are placed automatically.</div></section>
  <div class="home-grid">
-  <section class="panel"><div class="sectionhead"><div><h2>LIVE ACTIVITY</h2><p>Recent player trades</p></div><span class="liveflag">● LIVE</span></div><div id="activityList" class="activity-list"><div class="empty">Loading recent trades…</div></div></section>
   <section class="panel"><div class="sectionhead"><div><h2>MARKET ALERTS</h2><p>New records, reversals and notable moves</p></div></div><div id="alertsList" class="feed-list"><div class="empty">Waiting for market data…</div></div></section>
+  <section class="panel"><div class="sectionhead"><div><h2>LIVE ACTIVITY</h2><p>Recent player trades</p></div><span class="liveflag">● LIVE</span></div><div id="activityList" class="activity-list"><div class="empty">Loading recent trades…</div></div></section>
  </div>
-</div>
-<div id="page-intelligence" class="page">
- <section class="panel"><div class="sectionhead"><div><h2>MARKET INTELLIGENCE</h2><p>Live movement, trend strength, volatility and signal score</p></div><span class="liveflag">● LIVE</span></div><div class="tablewrap"><table class="intel-table"><thead><tr><th>Coin</th><th>5 min</th><th>15 min</th><th>1 hour</th><th>24 hours</th><th>Trend</th><th>Volatility</th><th>Score</th><th>High distance</th><th>Low distance</th></tr></thead><tbody id="intelBody"><tr><td colspan="10">Loading analytics…</td></tr></tbody></table></div></section>
- <section class="panel"><div class="sectionhead"><div><h2>MARKET HEATMAP</h2><p>24-hour performance · tile area reflects absolute movement</p></div></div><div id="heatmap" class="treemap"></div></section>
-</div>
-<div id="page-scanner" class="page">
- <section class="panel"><div class="sectionhead"><div><h2>OPPORTUNITY SCANNER</h2><p>Coins with notable momentum, trend strength and volatility</p></div><span class="liveflag">● LIVE</span></div><div id="scannerList" class="scanner-grid"></div></section>
- <section class="panel"><div class="sectionhead"><div><h2>BREAKOUT WATCH</h2><p>Coins approaching or exceeding their recorded highs</p></div></div><div id="breakoutList" class="feed-list"></div></section>
 </div>
 <div id="page-leaderboards" class="page">
  <section class="panel"><div class="sectionhead"><div><h2>LEADERBOARDS</h2><p>Explore player rankings</p></div></div><div class="subtabs"><button class="subtab active" data-period="month">Monthly</button><button class="subtab" data-period="all">All Time</button></div><div id="leaderboardList" class="leaderboard-list">Loading leaderboard…</div></section>
@@ -177,10 +206,10 @@ function clearHover(sym){chartHover[sym]=null;let tip=document.getElementById('t
 function ringColor(g){if(!Number.isFinite(g))return '#667085';if(g>=50)return '#ff3b6b';if(g>=25)return '#ff8a3d';if(g>=15)return '#ffd166';if(g>=8)return '#64d98b';if(g>=3)return '#4db8ff';return '#718096'}
 function ringScale(g){return Number.isFinite(g)?Math.max(3,Math.min(100,g/50*100)):0}
 function render(){for(const sym of syms){let c=lastCoins[sym]||{},s=state[sym]||{},p=Number(c.price);document.getElementById('price-'+sym).textContent=fmt(p);let ch=document.getElementById('chg-'+sym),change=c.change;ch.textContent=change==null?'—':`${change>=0?'+':''}${Number(change).toFixed(2)}%`;ch.className='chg '+(change==null?'':change>=0?'up':'down');document.getElementById('low-'+sym).textContent=fmt(s.low);document.getElementById('high-'+sym).textContent=fmt(s.high);let valid=Number.isFinite(p)&&p>0&&Number.isFinite(s.low)&&Number.isFinite(s.high);let pos=(valid&&s.high>s.low)?Math.max(0,Math.min(100,(p-s.low)/(s.high-s.low)*100)):0;document.getElementById('range-'+sym).style.width=pos+'%';let up=valid?Math.max(0,(s.high-p)/p*100):NaN,down=valid?Math.max(0,(p-s.low)/p*100):NaN;document.getElementById('upgain-'+sym).textContent=Number.isFinite(up)?'+'+up.toFixed(2)+'%':'—';document.getElementById('downgain-'+sym).textContent=Number.isFinite(down)?'+'+down.toFixed(2)+'%':'—';document.getElementById('uptarget-'+sym).textContent=valid?'to '+fmt(s.high):'to observed high';document.getElementById('downtarget-'+sym).textContent=valid?'to '+fmt(s.low):'to observed low';let pick=document.getElementById('pick-'+sym),uo=document.getElementById('upopt-'+sym),dn=document.getElementById('downopt-'+sym);uo.classList.remove('best');dn.classList.remove('best');if(valid&&up>down){pick.textContent='UP · '+up.toFixed(2)+'% range';pick.className='tradepick up';uo.classList.add('best')}else if(valid){pick.textContent='DOWN · '+down.toFixed(2)+'% range';pick.className='tradepick down';dn.classList.add('best')}let ev=(window.latestEvents||{})[sym];let e=document.getElementById('event-'+sym);e.textContent=ev&&ev.type?`${ev.type} · ${fmt(ev.price)}`:`Cloud samples · ${s.samples||0}`;e.className='event '+(ev?.type==='NEW HIGH'?'high':ev?.type==='NEW LOW'?'low':'');draw(sym)}}
-async function poll(){try{let r=await fetch('/api/state?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);let d=await r.json();state=d.records||{};window.latestEvents=d.events||{};lastCoins={};for(const sym of syms){let x=d.coins?.[sym]||{};lastCoins[sym]={price:x.price,change:x.change,ts:x.ts}}sessionSamples++;status.textContent=d.server?.ok?'Cloud collector live':'Collector warning';dot.classList.toggle('off',!d.server?.ok);time.textContent=d.server?.last_poll?new Date(d.server.last_poll).toLocaleTimeString():'—';tick.textContent=(d.server?.tick_ms||3000)+' ms';session.textContent=sessionSamples+' dashboard polls';render();renderMarketFeeds();await Promise.all(syms.map(async sym=>{try{await loadHistory(sym,true);draw(sym)}catch(_){}}))}catch(e){status.textContent='Dashboard connection error';dot.classList.add('off');time.textContent=e.message}}
+async function poll(){try{let r=await fetch('/api/state?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);let d=await r.json();state=d.records||{};window.latestEvents=d.events||{};lastCoins={};for(const sym of syms){let x=d.coins?.[sym]||{};lastCoins[sym]={price:x.price,change:x.change,ts:x.ts}}sessionSamples++;status.textContent='Connected';dot.classList.toggle('off',!d.server?.ok);time.textContent=d.server?.last_poll?new Date(d.server.last_poll).toLocaleTimeString():'—';tick.textContent=(d.server?.tick_ms||3000)+' ms';session.textContent=sessionSamples+' dashboard polls';render();renderMarketFeeds();await Promise.all(syms.map(async sym=>{try{await loadHistory(sym,true);draw(sym)}catch(_){}}))}catch(e){status.textContent='Dashboard connection error';dot.classList.add('off');time.textContent=e.message}}
 let loggedIn=false,pollTimer=null;
 const loginScreen=document.getElementById('loginScreen'),dashboard=document.getElementById('dashboard'),loginForm=document.getElementById('loginForm'),loginError=document.getElementById('loginError');
-function showDashboard(){loggedIn=true;loginScreen.style.display='none';dashboard.hidden=false;loadActivity();loadTradeAssistant();poll();if(!pollTimer)pollTimer=setInterval(()=>{if(loggedIn)poll()},3000)}
+function showDashboard(){loggedIn=true;loginScreen.style.display='none';dashboard.hidden=false;loadActivity();poll();if(!pollTimer)pollTimer=setInterval(()=>{if(loggedIn)poll()},3000)}
 loginForm.addEventListener('submit',async e=>{e.preventDefault();loginError.textContent='';let b=loginForm.querySelector('button[type=submit]');b.disabled=true;b.textContent='Signing in…';try{let r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('loginUser').value,password:document.getElementById('loginPass').value})});let d=await r.json();if(!r.ok)throw Error(d.error||'Unable to sign in');showDashboard()}catch(err){loginError.textContent=err.message||'Incorrect username or password'}finally{b.disabled=false;b.textContent='Sign in'}});
 document.getElementById('togglePassword').onclick=()=>{let p=document.getElementById('loginPass'),b=document.getElementById('togglePassword');p.type=p.type==='password'?'text':'password';b.textContent=p.type==='password'?'Show':'Hide'};
 document.getElementById('logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'})}catch{}loggedIn=false;dashboard.hidden=true;loginScreen.style.display='flex';loginForm.reset();loginError.textContent='You have signed out.'};
@@ -190,10 +219,12 @@ document.getElementById('cards').addEventListener('click',async e=>{let card=e.t
 document.getElementById('csv').onclick=()=>location.href='/api/export.csv';
 importBtn.onclick=()=>importFile.click();importFile.onchange=async()=>{let f=importFile.files&&importFile.files[0];if(!f)return;if(!confirm('Merge '+f.name+' into the cloud tracker? Existing data will be preserved and a database backup will be created first.')){importFile.value='';return}try{status.textContent='Importing…';let r=await fetch('/api/import',{method:'POST',headers:{'Content-Type':'text/csv'},body:await f.arrayBuffer()});let d=await r.json();if(!r.ok)throw Error(d.error||('HTTP '+r.status));alert(`Import complete\n\n${d.priceRecordsAdded} price records added\n${d.eventsAdded} extrema events added\n${d.duplicatesSkipped} duplicates skipped\n${d.cryptosUpdated} cryptos updated\n\nBackup: ${d.backup}`);historyCache={};await poll()}catch(e){alert('Import failed: '+e.message);status.textContent='Import failed'}finally{importFile.value=''}};
 
-// Bitcoin Hero v23 navigation and social/player features
-let leaderboardPeriod='month',currentPlayerReturn='leaderboards',cachedIntel=[];
+// Bitcoin Hero v26 navigation and social/player features
+let leaderboardPeriod='month',currentPlayerReturn='leaderboards';
 const logoEmoji={BTC:'₿',ETH:'◆',SOL:'≋',DOGE:'Ð',XRP:'X',ADA:'⠿',LINK:'⬡',AVAX:'▲'};
-function showPage(name){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+name));document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.page===name));if(name==='intelligence')loadIntelligence();if(name==='scanner')loadIntelligence();if(name==='leaderboards')loadLeaderboard(leaderboardPeriod)}
+const logoClass={BTC:'btc',ETH:'eth',SOL:'sol',DOGE:'doge',XRP:'xrp',ADA:'ada',LINK:'link',AVAX:'avax'};
+function coinIcon(sym){sym=String(sym||'BTC').toUpperCase();return `<span class="coinlogo ${logoClass[sym]||'btc'}">${logoEmoji[sym]||'₿'}</span>`}
+function showPage(name){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+name));document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.page===name));if(name==='leaderboards')loadLeaderboard(leaderboardPeriod)}
 document.getElementById('mainNav').addEventListener('click',e=>{let b=e.target.closest('[data-page]');if(b)showPage(b.dataset.page)});
 document.querySelector('.subtabs').addEventListener('click',e=>{let b=e.target.closest('[data-period]');if(!b)return;leaderboardPeriod=b.dataset.period;document.querySelectorAll('.subtab').forEach(x=>x.classList.toggle('active',x===b));loadLeaderboard(leaderboardPeriod)});
 async function apiJson(url){let r=await fetch(url,{cache:'no-store'});let d=await r.json();if(!r.ok)throw Error(d.error||'API request failed');return d}
@@ -208,16 +239,38 @@ function avatarHtml(x,size=32){let id=playerId(x),name=playerName(x),url=avatarU
 function playerButton(x){let n=playerName(x),id=playerId(x);return `<button class="player-link" data-player="${safeText(n)}" data-playerid="${safeText(id)}">${safeText(n)}</button>`}
 function money(v){let n=Number(v);return Number.isFinite(n)?(n<0?'−':'')+'$'+Math.abs(n).toLocaleString(undefined,{maximumFractionDigits:2}):'—'}
 async function loadActivity(){try{let d=await apiJson('/api/activity'),items=pickArray(d);let el=document.getElementById('activityList');if(!items.length){el.innerHTML='<div class="empty">No recent trades available.</div>';return}
-el.innerHTML=items.map(x=>{let sym=coinSym(x),pnl=Number(x.pnl??x.profitLoss??x.profit??x.amount??0),name=playerName(x),id=playerId(x),trade=x.tradeId||x.id||'';return `<div class="activity-row"><span class="activity-coin coinmark">${safeText(logoEmoji[sym]||sym.slice(0,3))}</span>${avatarHtml(x,30)}<div style="min-width:0"><div>${playerButton(x)}</div><div class="activity-meta">Trade · ${safeText(trade)}</div></div><span class="pnl ${pnl>=0?'up':'down'}">${pnl>=0?'+':'−'}${money(Math.abs(pnl))}</span></div>`}).join('')}catch(e){document.getElementById('activityList').innerHTML='<div class="empty">Live activity is temporarily unavailable.</div>'}}
+el.innerHTML=items.map(x=>{let sym=coinSym(x),pnl=Number(x.pnl??x.profitLoss??x.profit??x.amount??0),name=playerName(x),id=playerId(x);return `<div class="activity-row">${coinIcon(sym)}${avatarHtml(x,30)}<div style="min-width:0"><div>${playerButton(x)}</div></div><span class="pnl ${pnl>=0?'up':'down'}">${pnl>=0?'+':'−'}${money(Math.abs(pnl))}</span></div>`}).join('')}catch(e){document.getElementById('activityList').innerHTML='<div class="empty">Live activity is temporarily unavailable.</div>'}}
 function pct(v){let n=Number(v);return Number.isFinite(n)?(n>=0?'+':'')+n.toFixed(2)+'%':'—'}
-async function loadIntelligence(){try{let d=await apiJson('/api/intelligence');cachedIntel=d.coins||[];renderIntelligence(cachedIntel)}catch(e){document.getElementById('intelBody').innerHTML='<tr><td colspan="10">Market analytics are collecting data.</td></tr>'}}
-function renderIntelligence(rows){let tb=document.getElementById('intelBody');tb.innerHTML=rows.map(x=>{let cls=v=>Number(v)>=0?'up':'down';return `<tr><td>${x.symbol}</td><td class="${cls(x.m5)}">${pct(x.m5)}</td><td class="${cls(x.m15)}">${pct(x.m15)}</td><td class="${cls(x.h1)}">${pct(x.h1)}</td><td class="${cls(x.h24)}">${pct(x.h24)}</td><td class="${x.trend==='UP'?'up':'down'}">${x.trend}</td><td>${Number(x.volatility||0).toFixed(3)}%</td><td><span class="scorebar">${x.score}/100 <span class="scoretrack"><i style="width:${x.score}%"></i></span></span></td><td>${pct(x.highDistance)}</td><td>${pct(x.lowDistance)}</td></tr>`}).join('');
-renderHeatmap(rows);document.getElementById('scannerList').innerHTML=[...rows].sort((a,b)=>b.score-a.score).slice(0,8).map(x=>`<div class="signal-card"><h3>${x.symbol} <span class="${x.trend==='UP'?'up':'down'}">${x.trend}</span></h3><div class="score">${x.score}/100</div><div class="muted">24h ${pct(x.h24)} · volatility ${Number(x.volatility||0).toFixed(3)}%</div><div class="muted">Momentum ${pct(x.m15)} over 15 minutes</div></div>`).join('');
-document.getElementById('breakoutList').innerHTML=rows.filter(x=>x.highDistance<5).map(x=>`<div class="feed-row"><b>${x.symbol}</b> is ${x.highDistance.toFixed(2)}% from its recorded high</div>`).join('')||'<div class="empty">No coins are currently within 5% of their recorded highs.</div>'}
-function renderHeatmap(rows){let sorted=[...rows].sort((a,b)=>Math.abs(b.h24)-Math.abs(a.h24)),el=document.getElementById('heatmap');if(!sorted.length){el.innerHTML='<div class="empty">Waiting for 24-hour data…</div>';return}
-let total=sorted.reduce((s,x)=>s+Math.max(.2,Math.abs(x.h24||0)),0),left=sorted.slice(0,4),right=sorted.slice(4);function col(arr){let t=arr.reduce((s,x)=>s+Math.max(.2,Math.abs(x.h24||0)),0);return `<div class="treecol" style="flex:${t};">${arr.map(x=>`<div class="treetile" style="flex:${Math.max(.2,Math.abs(x.h24||0))};background:${x.h24>=0?'#0d5a3c':'#8f1d2b'}"><strong>${x.symbol}</strong><span>${pct(x.h24)}</span></div>`).join('')}</div>`}el.innerHTML=col(left)+col(right)}
-async function loadLeaderboard(period){try{let d=await apiJson('/api/leaderboard?period='+period),items=pickArray(d);let el=document.getElementById('leaderboardList');if(!items.length){el.innerHTML='<div class="empty">No leaderboard entries returned.</div>';return}
-el.innerHTML=items.map((x,i)=>`<div class="leader-row" data-player="${safeText(playerName(x))}" data-playerid="${safeText(playerId(x))}"><span class="ranknum">${x.rank||i+1}</span>${avatarHtml(x,34)}<div><div class="player-link">${safeText(playerName(x))}</div><div class="activity-meta">${safeText(x.level?('Level '+x.level):x.title||'Player')}</div></div><div class="leader-value">${money(x.netWorth??x.net_worth??x.balance??x.profit??x.pnl??x.totalProfit??x.total_profit)}</div></div>`).join('')}catch(e){document.getElementById('leaderboardList').innerHTML='<div class="empty">Leaderboard is temporarily unavailable.</div>'}}
+function leaderboardValue(x){return x.netWorth??x.net_worth??x.balance??x.profit??x.pnl??x.totalProfit??x.total_profit}
+function leaderboardLevel(x){let v=x.level;return v&&typeof v==='object'?(v.level??''):v??x.levelNumber??''}
+function podiumPlayer(x,rank){
+ const name=playerName(x),id=playerId(x),level=leaderboardLevel(x);
+ return `<button class="podium-player rank-${rank}" data-player="${safeText(name)}" data-playerid="${safeText(id)}" type="button">
+ <span class="podium-avatar">${avatarHtml(x,rank===1?72:56)}</span><span class="podium-rank">${rank}</span>
+ <strong>${safeText(name)}</strong><span class="podium-level">${level!==''?'Level '+safeText(level):''}</span>
+ <span class="podium-value">${money(leaderboardValue(x))}</span></button>`;
+}
+async function loadLeaderboard(period){
+ try{
+  const d=await apiJson('/api/leaderboard?period='+encodeURIComponent(period));
+  const items=pickArray(d).slice().sort((a,b)=>{
+   const ra=Number(a.rank),rb=Number(b.rank);
+   if(Number.isFinite(ra)&&Number.isFinite(rb)&&ra!==rb)return ra-rb;
+   if(Number.isFinite(ra)!==Number.isFinite(rb))return Number.isFinite(ra)?-1:1;
+   return Number(leaderboardValue(b)||0)-Number(leaderboardValue(a)||0);
+  });
+  const el=document.getElementById('leaderboardList');
+  if(!items.length){el.innerHTML='<div class="empty">No leaderboard entries returned for this period.</div>';return}
+  const top=items.slice(0,3),rest=items.slice(3);
+  const rankOf=(x,i)=>Number(x.rank)>0?Number(x.rank):i+1;
+  const podium=top.length?`<div class="podium">${(top.length===3?[top[1],top[0],top[2]]:top).map(x=>podiumPlayer(x,rankOf(x,items.indexOf(x)))).join('')}</div>`:'';
+  const rows=rest.map((x,i)=>{
+   const rank=rankOf(x,i+3),level=leaderboardLevel(x);
+   return `<button class="leader-row" data-player="${safeText(playerName(x))}" data-playerid="${safeText(playerId(x))}" type="button"><span class="ranknum">${rank}</span>${avatarHtml(x,36)}<div class="leader-person"><strong>${safeText(playerName(x))}</strong><span class="activity-meta">${level!==''?'Level '+safeText(level):'Player'}</span></div><span class="leader-value">${money(leaderboardValue(x))}</span></button>`;
+  }).join('');
+  el.innerHTML=podium+(rows?`<div class="leaderboard-rest">${rows}</div>`:'');
+ }catch(e){document.getElementById('leaderboardList').innerHTML='<div class="empty">Leaderboard is temporarily unavailable. Please try again.</div>'}
+}
 document.addEventListener('click',e=>{let p=e.target.closest('[data-player]');if(p){let name=p.dataset.player,id=p.dataset.playerid;currentPlayerReturn=document.querySelector('.page.active')?.id.replace('page-','')||'leaderboards';openPlayer(name,id)}});
 document.getElementById('playerBack').onclick=()=>{document.getElementById('playerOverlay').hidden=true;showPage(currentPlayerReturn)};
 
@@ -326,37 +379,16 @@ async function openPlayer(name,id){
 }
 function drawProfile(hist){let cv=document.getElementById('profileChart');if(!cv||!hist.length)return;let ctx=cv.getContext('2d'),w=cv.clientWidth,h=cv.clientHeight;cv.width=w*devicePixelRatio;cv.height=h*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);let vals=hist.map(x=>Number(typeof x==='number'?x:(x.netWorth??x.balance??x.value))).filter(Number.isFinite);if(vals.length<2)return;let lo=Math.min(...vals),hi=Math.max(...vals),pad=(hi-lo)*.1||1;ctx.strokeStyle='#20c982';ctx.lineWidth=2;ctx.beginPath();vals.forEach((v,i)=>{let x=i/(vals.length-1)*w,y=5+(hi+pad-v)/(hi-lo+2*pad)*(h-10);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}
 
-async function loadTradeAssistant(){
- try{
-  const data=await apiJson('/api/trade-assistant');
-  const el=document.getElementById('tradeAssistant');
-  const items=Array.isArray(data.coins)?data.coins:[];
-  el.innerHTML=items.length?items.map(x=>{
-   const action=x.action||'WAIT',good=action==='UP SETUP',bad=action==='DOWN SETUP';
-   const cls=good?'up':bad?'down':'';
-   const price=x.price!=null?fmt(x.price):'—';
-   const level=v=>v==null?'Not available':fmt(v);
-   const rr=x.riskReward==null?'Not available':Number(x.riskReward).toFixed(2)+':1';
-   const reasons=(x.reasons||[]).map(v=>safeText(v)).join(' · ');
-   return `<article class="assistant-card"><h3>${safeText(x.symbol)} <span class="signal ${cls}">${safeText(action)}</span></h3>
-   <div class="detail">Current <b>${price}</b> · Score <b>${Number(x.score||0)}/100</b></div>
-   <div class="detail">Entry zone <b>${x.entryLow!=null&&x.entryHigh!=null?level(x.entryLow)+' – '+level(x.entryHigh):'Not available'}</b></div>
-   <div class="detail">Target <b>${level(x.target)}</b> · Stop <b>${level(x.stop)}</b></div>
-   <div class="detail">Risk / reward <b>${rr}</b> · 24h move <b>${x.m24==null?'Unknown':pct(x.m24)}</b></div>
-   <div class="why">${reasons||'Insufficient stored data to assess the market.'}</div></article>`;
-  }).join(''):'<div class="empty">No price data available yet.</div>';
- }catch(e){document.getElementById('tradeAssistant').innerHTML='<div class="empty">Trade analysis unavailable; market history may still be collecting.</div>'}
-}
 function renderMarketFeeds(){
  let evs=Object.entries(window.latestEvents||{}).map(([symbol,e])=>({symbol,...e})).filter(x=>x.type);
  evs.sort((a,b)=>(b.ts||0)-(a.ts||0));
  let alerts=document.getElementById('alertsList');
  if(!evs.length){alerts.innerHTML='<div class="empty">No new record alerts yet.</div>';return}
- alerts.innerHTML=evs.map(e=>`<div class="feed-row"><b>${e.symbol}</b><span class="${e.type==='NEW HIGH'?'up':'down'}">${e.type}</span><span>${fmt(e.price)}</span><span class="muted">${e.ts?new Date(e.ts).toLocaleString():''}</span></div>`).join('');
+ alerts.innerHTML=evs.map(e=>`<div class="feed-row">${coinIcon(e.symbol)}<span class="${e.type==='NEW HIGH'?'up':'down'}">${e.type}</span><span>${fmt(e.price)}</span><span class="muted">${e.ts?new Date(e.ts).toLocaleString():''}</span></div>`).join('');
 
 }
 
-loadActivity();setInterval(()=>{if(loggedIn){loadActivity();loadTradeAssistant();if(document.getElementById('page-leaderboards').classList.contains('active'))loadLeaderboard(leaderboardPeriod);if(document.getElementById('page-intelligence').classList.contains('active')||document.getElementById('page-scanner').classList.contains('active'))loadIntelligence()}},15000);
+loadActivity();setInterval(()=>{if(loggedIn){loadActivity();if(document.getElementById('page-leaderboards').classList.contains('active'))loadLeaderboard(leaderboardPeriod);}},15000);
 
 addEventListener('resize',()=>syms.forEach(draw));checkSession();
 </script></body></html>
