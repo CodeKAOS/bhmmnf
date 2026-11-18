@@ -95,3 +95,25 @@ The tracker requests both /api/leaderboard?period=month and /api/leaderboard?per
 Avatar 404 handling: once an avatar fails in the browser, its player id is remembered for the session and initials are displayed on subsequent renders. The server caches upstream 404 responses for 24 hours.
 
 No production deployment is performed by creating this ZIP. Upload/deploy it to Northflank using the existing service configuration and persistent /data volume.
+
+VERSION 29 - READ-ONLY DAILY DATA EXPORT
+
+Adds GET /api/admin/daily-export, protected by a dedicated bearer token in the DAILY_EXPORT_TOKEN environment variable. This is separate from TRACKER_USERNAME / TRACKER_PASSWORD. Requests without the correct token receive 401. The route is read-only and does not expose credentials or support database writes.
+
+Export contents:
+- SQLite table counts and total price-history coverage.
+- Latest recorded price for each tracked coin.
+- Protected historical extrema (low/high and timestamps).
+- Recent price observations (up to 50,000 rows from the last 24 hours; the full history remains in SQLite).
+- Recent alert/event records from the last 7 days.
+- Collector health and last polling error.
+- Separate live game activity, Monthly leaderboard and All Time leaderboard API payloads. These are explicitly external game API data, not SQLite trade records.
+
+Northflank setup after deploying this package:
+1. Keep the existing persistent volume mounted at /data. Do not delete or recreate it.
+2. Keep TRACKER_USERNAME and TRACKER_PASSWORD unchanged.
+3. Add a new environment variable DAILY_EXPORT_TOKEN with a long, randomly generated secret (at least 32 random bytes). Do not reuse the tracker login password.
+4. Redeploy and test GET https://YOUR-SERVICE/api/admin/daily-export with an Authorization: Bearer <token> header. Never put the token in a URL or browser query string.
+5. The scheduled daily report cannot read this private endpoint until a secure credential handoff is configured. Do not paste the token into an ordinary chat message. The report must not claim it has read SQLite until a successful authenticated export has actually been retrieved.
+
+No database schema changes, data deletion, or writes are performed by the export endpoint. Trade history is not stored in this tracker's local SQLite schema; current game activity and leaderboard payloads are included separately from the local database export.

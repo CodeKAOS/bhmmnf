@@ -10,6 +10,7 @@ REMOTE=os.getenv('BITCOIN_HERO_API','https://api.bitcoinhero.me/api/prices')
 PORT=int(os.getenv('PORT','8000')); HOST=os.getenv('HOST','0.0.0.0')
 AUTH_USER=os.getenv('TRACKER_USERNAME','admin')
 AUTH_PASS=os.getenv('TRACKER_PASSWORD','')
+DAILY_EXPORT_TOKEN=os.getenv('DAILY_EXPORT_TOKEN','').strip()
 DATA_DIR=os.getenv('DATA_DIR','/data' if os.path.isdir('/data') else os.path.join(os.path.dirname(__file__),'data'))
 os.makedirs(DATA_DIR, exist_ok=True); DB=os.path.join(DATA_DIR,'bitcoin_hero.sqlite3')
 SYMS=['BTC','ETH','SOL','DOGE','XRP','ADA','LINK','AVAX']
@@ -288,6 +289,36 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e: return self.send_json({'error':str(e)},400)
     def do_GET(self):
         u=urlparse(self.path)
+        # Dedicated read-only export for scheduled reporting. Requires a separate token;
+        # it never exposes credentials or permits writes/imports.
+        if u.path=='/api/admin/daily-export':
+            supplied=self.headers.get('Authorization','')
+            if not DAILY_EXPORT_TOKEN or not supplied.startswith('Bearer ') or not hmac.compare_digest(supplied[7:],DAILY_EXPORT_TOKEN):
+                return self.send_json({'error':'unauthorized'},401)
+            try:
+                now=int(time.time()*1000)
+                with lock, con() as c:
+                    counts={}
+                    for table in ('prices','candles','records','events'):
+                        counts[table]=int(c.execute('SELECT COUNT(*) FROM '+table).fetchone()[0])
+                    records=[dict(r) for r in c.execute('SELECT * FROM records ORDER BY symbol').fetchall()]
+                    latest=[]
+                    for sym in SYMS:
+                        r=c.execute('SELECT ts,price,change FROM prices WHERE symbol=? ORDER BY ts DESC LIMIT 1',(sym,)).fetchone()
+                        if r: latest.append({'symbol':sym,**dict(r)})
+                    events=[dict(r) for r in c.execute('SELECT ts,symbol,type,price FROM events WHERE ts>=? ORDER BY ts DESC LIMIT 500',(now-7*86400000,)).fetchall()]
+                    # A bounded recent sample; complete history remains safely in SQLite.
+                    recent=[dict(r) for r in c.execute('SELECT ts,symbol,price,change FROM prices WHERE ts>=? ORDER BY ts DESC LIMIT 50000',(now-86400000,)).fetchall()]
+                    coverage=c.execute('SELECT MIN(ts) AS firstTs,MAX(ts) AS lastTs FROM prices').fetchone()
+                payload={'generatedAt':now,'database':{'counts':counts,'coverage':dict(coverage) if coverage else {},'latestPrices':latest,'protectedExtrema':records,'recentEvents7d':events,'recentPriceObservations24h':recent,'recentPriceObservationsTruncated':len(recent)>=50000},'collector':dict(runtime)}
+                # Include current public game activity and both ranking datasets, clearly
+                # separated from tracker-local SQLite observations.
+                for key,url in [('gameActivity','https://api.bitcoinhero.me/api/activity'),('monthlyLeaderboard','https://api.bitcoinhero.me/api/leaderboard?period=month'),('allTimeLeaderboard','https://api.bitcoinhero.me/api/leaderboard?period=all')]:
+                    try: payload[key]=external_json(url)
+                    except Exception as e: payload[key]={'error':str(e)}
+                return self.send_json(payload,200,{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'})
+            except Exception as e:
+                return self.send_json({'error':'daily export failed','detail':str(e)},500)
         # Serve only the login-capable dashboard shell before authentication; APIs remain protected.
         if u.path in ('/','/tracker.html'):
             self.path='/tracker.html'; return super().do_GET()
