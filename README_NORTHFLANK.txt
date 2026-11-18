@@ -49,3 +49,13 @@ V24 GRAPH RESTORATION
 - Backend history supports the 5M and 15M range parameters. ALL TIME reads retained hourly candles from the existing SQLite database.
 
 UI layout correction: all eight coin cards display compact individual charts and their own LIVE, 5M, 15M, 1H, 1 DAY and ALL TIME controls. Selecting a coin no longer expands its chart or hides the other cards' controls.
+
+
+V25 changes:
+- Coin card positions are fixed BTC, ETH, SOL, DOGE, XRP, ADA, LINK, AVAX.
+- Every card has the same compact graph layout and independent LIVE/5M/15M/1H/1 DAY/ALL TIME selection.
+- Removed the Market History dashboard panel (historical SQLite price and extrema records are preserved).
+- Added spacing above Live Activity and Market Alerts.
+- Added Trade Opportunity Assistant: all eight coins ranked with conservative WAIT / UP SETUP / DOWN SETUP analysis, price-based levels, risk/reward and reasons. It uses observed stored prices; insufficient data produces WAIT. Not investment advice, not automatic trading.
+- Added authenticated GET /api/trade-assistant.
+- No database schema changes or data deletion. Keep the existing persistent /data volume.

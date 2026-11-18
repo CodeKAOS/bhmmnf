@@ -93,8 +93,29 @@
   .coin:not(.selected) .chartcontrols button { padding: 4px 5px; font-size: 8px; }
 }
 
+
+/* v25: fixed coin positions and matching chart presentation */
+.cards > .coin {grid-column:auto!important;cursor:default!important;background:linear-gradient(180deg,#121824,#0e131c)!important;border-color:var(--line)!important}
+.cards .chartbox {height:104px!important;margin:6px 0 9px!important}
+.cards .chartcontrols {display:flex!important;gap:4px;flex-wrap:wrap}
+.cards .chartcontrols button {padding:4px 6px;font-size:9px}
+.cards .chartlabel {width:100%;text-align:right;margin:0}
+.cards .charttip {display:none}
+.cards .charttip.show {display:block!important}
+.home-grid {margin-top:30px}
+.trade-assistant {margin-top:24px}
+.assistant-grid {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.assistant-card {padding:14px;background:#0c121b;border:1px solid #2c374a;border-radius:12px}
+.assistant-card h3 {margin:0 0 8px;display:flex;align-items:center;justify-content:space-between}
+.assistant-card .signal {font-size:12px;font-weight:850;padding:5px 8px;border-radius:7px;background:#192232}
+.assistant-card .detail {font-size:12px;color:#a9b9d0;margin-top:6px;line-height:1.5}
+.assistant-card .detail b {color:#eaf0f9}
+.assistant-card .why {margin-top:9px;font-size:11px;color:#a9b9d0}
+.assistant-note {font-size:11px;color:#95a8c2;margin-top:14px;line-height:1.6}
+@media(max-width:1100px){.assistant-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.assistant-grid{grid-template-columns:1fr}.cards .chartbox{height:90px!important}.home-grid{margin-top:24px}}
 </style></head><body><div id="loginScreen" class="login-screen"><form id="loginForm" class="login-card"><div class="login-brand"><div class="login-mark">₿</div><div><div class="login-title">Bitcoin Hero</div><div class="login-sub">Secure market monitor</div></div></div><label for="loginUser">Username</label><input id="loginUser" name="username" autocomplete="username" required autofocus><label for="loginPass">Password</label><div class="password-row"><input id="loginPass" name="password" type="password" autocomplete="current-password" required><button id="togglePassword" type="button">Show</button></div><button class="login-submit" type="submit">Sign in</button><div id="loginError" class="login-error" role="alert"></div><div class="login-hint">Sign in to view live prices and protected market records.</div></form></div><div id="dashboard" hidden><div class="wrap">
-<div class="top"><div class="brand"><div class="logo">B</div><div><div class="eyebrow">Live simulated market · Tracker v23</div><h1>Bitcoin Hero <span style="font-size:12px;vertical-align:middle;color:#f7931a;border:1px solid #68451f;border-radius:7px;padding:3px 6px;letter-spacing:.04em">v23</span></h1></div></div><div class="actions"><button id="importBtn">Import & Merge CSV</button><button id="csv">Export cloud CSV</button><button id="logoutBtn" class="logout">Log out</button><input id="importFile" type="file" accept=".csv,text/csv" hidden></div></div>
+<div class="top"><div class="brand"><div class="logo">B</div><div><div class="eyebrow">Live simulated market · Tracker v25</div><h1>Bitcoin Hero <span style="font-size:12px;vertical-align:middle;color:#f7931a;border:1px solid #68451f;border-radius:7px;padding:3px 6px;letter-spacing:.04em">v25</span></h1></div></div><div class="actions"><button id="importBtn">Import & Merge CSV</button><button id="csv">Export cloud CSV</button><button id="logoutBtn" class="logout">Log out</button><input id="importFile" type="file" accept=".csv,text/csv" hidden></div></div>
 <div class="statusbar"><div class="live"><span id="dot" class="dot off"></span><span id="status">Connecting…</span></div><div class="meta">Last update <b id="time">—</b></div><div class="meta">API tick <b id="tick">—</b></div><div class="meta">Session <b id="session">0 samples</b></div></div>
 <div class="mainnav" id="mainNav">
  <button class="navbtn active" data-page="home">Market</button>
@@ -104,10 +125,10 @@
 </div>
 <div id="page-home" class="page active">
  <div id="cards" class="cards"></div>
+ <section class="panel trade-assistant"><div class="sectionhead"><div><h2>TRADE OPPORTUNITY ASSISTANT</h2><p>Data-based setups across all eight coins · not a profit guarantee</p></div><span class="liveflag">● LIVE ANALYSIS</span></div><div id="tradeAssistant" class="assistant-grid"><div class="empty">Collecting market information…</div></div><div class="assistant-note">Signals use stored market prices, recent trend, volatility and local support/resistance. Entry zones, targets and stops are illustrative analytical levels, not execution instructions. WAIT means there is insufficient evidence for a defensible setup. No trades are placed automatically.</div></section>
  <div class="home-grid">
   <section class="panel"><div class="sectionhead"><div><h2>LIVE ACTIVITY</h2><p>Recent player trades</p></div><span class="liveflag">● LIVE</span></div><div id="activityList" class="activity-list"><div class="empty">Loading recent trades…</div></div></section>
   <section class="panel"><div class="sectionhead"><div><h2>MARKET ALERTS</h2><p>New records, reversals and notable moves</p></div></div><div id="alertsList" class="feed-list"><div class="empty">Waiting for market data…</div></div></section>
-  <section class="panel wide"><div class="sectionhead"><div><h2>MARKET HISTORY</h2><p>Recent significant market events</p></div></div><div id="marketHistory" class="feed-list"><div class="empty">Collecting market history…</div></div></section>
  </div>
 </div>
 <div id="page-intelligence" class="page">
@@ -126,7 +147,7 @@
 
 </div></div><script>
 const syms=['BTC','ETH','SOL','DOGE','XRP','ADA','LINK','AVAX'];
-let selectedSym='BTC';
+let selectedSym=null;
 const names={BTC:'Bitcoin',ETH:'Ethereum',SOL:'Solana',DOGE:'Dogecoin',XRP:'XRP',ADA:'Cardano',LINK:'Chainlink',AVAX:'Avalanche'};
 const accent={BTC:'#f7931a',ETH:'#8c9eff',SOL:'#b06dff',DOGE:'#d4b455',XRP:'#3fb8e8',ADA:'#4f79e0',LINK:'#5f83e8',AVAX:'#e8784f'};
 let state={},lastCoins={},sessionSamples=0,chartRange=Object.fromEntries(syms.map(s=>[s,'live'])),chartHover=Object.fromEntries(syms.map(s=>[s,null])),historyCache={};
@@ -140,18 +161,18 @@ function chartPoints(sym){return historyCache[key(sym)]||[]}
 function draw(sym){
  let cv=document.getElementById('chart-'+sym);if(!cv)return;let box=cv.parentElement,r=box.getBoundingClientRect(),dpr=devicePixelRatio||1;
  cv.width=Math.max(1,r.width*dpr);cv.height=Math.max(1,r.height*dpr);let ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
- let w=r.width,h=r.height,mini=sym!==selectedSym,axisW=mini?0:62,plotW=Math.max(30,w-axisW);ctx.clearRect(0,0,w,h);
+ let w=r.width,h=r.height,mini=false,axisW=46,plotW=Math.max(30,w-axisW);ctx.clearRect(0,0,w,h);
  let pts=chartPoints(sym),mode=chartRange[sym]||'live',labels={live:'LIVE · rolling 5 min','5m':'5 MIN','15m':'15 MIN','1h':'1 HOUR','1d':'1 DAY',all:'ALL · saved history'};
  let lab=document.getElementById('chartlabel-'+sym);if(lab)lab.textContent=(labels[mode]||'Price history')+' · '+pts.length+' points';
  if(!pts.length){ctx.fillStyle='#7f8999';ctx.font='11px system-ui';ctx.textAlign='center';ctx.fillText('Collecting price history…',plotW/2,h/2);return}
  let values=pts.map(p=>Number(p.close)).filter(v=>Number.isFinite(v)&&v>0),current=Number(lastCoins[sym]?.price);if(Number.isFinite(current)&&current>0)values.push(current);let lo=Math.min(...values),hi=Math.max(...values),pad=(hi-lo)*.12||Math.abs(hi)*.002||1;lo-=pad;hi+=pad;
- let top=mini?5:12,bottom=mini?h-5:h-16,y=v=>top+(hi-v)/(hi-lo)*(bottom-top);let n=pts.length;
+ let top=8,bottom=h-12,y=v=>top+(hi-v)/(hi-lo)*(bottom-top);let n=pts.length;
  if(!mini){ctx.font='9px system-ui';ctx.textBaseline='middle';ctx.textAlign='right';ctx.strokeStyle='#252d3b';ctx.lineWidth=1;for(let i=0;i<=4;i++){let value=hi-(hi-lo)*i/4,yy=y(value);ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(plotW-4,yy);ctx.stroke();ctx.fillStyle='#9aa5b5';let digits=Math.abs(value)<1?4:Math.abs(value)<100?2:0;ctx.fillText(value.toLocaleString(undefined,{minimumFractionDigits:digits,maximumFractionDigits:digits}),w-2,yy)}}
- let step=plotW/Math.max(1,n-1);ctx.beginPath();let started=false;pts.forEach((p,i)=>{let v=Number(p.close);if(!Number.isFinite(v)||v<=0)return;let xx=n===1?plotW/2:step*i,yy=y(v);if(!started){ctx.moveTo(xx,yy);started=true}else ctx.lineTo(xx,yy)});ctx.strokeStyle=accent[sym]||'#7aa2ff';ctx.lineWidth=mini?1.6:2.2;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
+ let step=plotW/Math.max(1,n-1);ctx.beginPath();let started=false;pts.forEach((p,i)=>{let v=Number(p.close);if(!Number.isFinite(v)||v<=0)return;let xx=n===1?plotW/2:step*i,yy=y(v);if(!started){ctx.moveTo(xx,yy);started=true}else ctx.lineTo(xx,yy)});ctx.strokeStyle=accent[sym]||'#7aa2ff';ctx.lineWidth=1.6;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
  if(!mini&&Number.isFinite(current)&&current>0){let yy=y(current);ctx.save();ctx.setLineDash([4,4]);ctx.strokeStyle=accent[sym]||'#7aa2ff';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(plotW-1,yy);ctx.stroke();ctx.restore();ctx.fillStyle=accent[sym]||'#7aa2ff';ctx.fillRect(plotW-1,Math.max(yy-9,0),axisW+1,18);ctx.fillStyle='#fff';ctx.textAlign='left';ctx.font='bold 9px system-ui';ctx.fillText(fmt(current),plotW+4,Math.max(yy,8));}
  let hv=chartHover[sym];if(!mini&&hv!=null&&hv>=0&&hv<pts.length){let p=pts[hv],xx=n===1?plotW/2:step*hv,yy=y(Number(p.close));ctx.save();ctx.setLineDash([3,3]);ctx.strokeStyle='#aab4c4aa';ctx.beginPath();ctx.moveTo(xx,4);ctx.lineTo(xx,h-4);ctx.stroke();ctx.restore();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(xx,yy,3,0,Math.PI*2);ctx.fill();let tip=document.getElementById('tip-'+sym);tip.innerHTML=`${fmt(p.close)}<span class="tttime">${new Date(p.ts).toLocaleString()}</span>`;tip.style.left=Math.max(70,Math.min(plotW-70,xx))+'px';tip.style.top=Math.max(38,yy)+'px';tip.classList.add('show')}
 }
-function hoverChart(sym,clientX){let cv=document.getElementById('chart-'+sym),r=cv.getBoundingClientRect(),pts=chartPoints(sym);if(!pts.length)return;let rel=Math.max(0,Math.min(1,(clientX-r.left)/(r.width-48))),best=Math.max(0,Math.min(pts.length-1,Math.floor(rel*pts.length)));chartHover[sym]=best;draw(sym)}
+function hoverChart(sym,clientX){let cv=document.getElementById('chart-'+sym),r=cv.getBoundingClientRect(),pts=chartPoints(sym);if(!pts.length)return;let rel=Math.max(0,Math.min(1,(clientX-r.left)/Math.max(1,r.width-46))),best=Math.max(0,Math.min(pts.length-1,Math.floor(rel*pts.length)));chartHover[sym]=best;draw(sym)}
 function clearHover(sym){chartHover[sym]=null;let tip=document.getElementById('tip-'+sym);if(tip)tip.classList.remove('show');draw(sym)}
 function ringColor(g){if(!Number.isFinite(g))return '#667085';if(g>=50)return '#ff3b6b';if(g>=25)return '#ff8a3d';if(g>=15)return '#ffd166';if(g>=8)return '#64d98b';if(g>=3)return '#4db8ff';return '#718096'}
 function ringScale(g){return Number.isFinite(g)?Math.max(3,Math.min(100,g/50*100)):0}
@@ -159,13 +180,13 @@ function render(){for(const sym of syms){let c=lastCoins[sym]||{},s=state[sym]||
 async function poll(){try{let r=await fetch('/api/state?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);let d=await r.json();state=d.records||{};window.latestEvents=d.events||{};lastCoins={};for(const sym of syms){let x=d.coins?.[sym]||{};lastCoins[sym]={price:x.price,change:x.change,ts:x.ts}}sessionSamples++;status.textContent=d.server?.ok?'Cloud collector live':'Collector warning';dot.classList.toggle('off',!d.server?.ok);time.textContent=d.server?.last_poll?new Date(d.server.last_poll).toLocaleTimeString():'—';tick.textContent=(d.server?.tick_ms||3000)+' ms';session.textContent=sessionSamples+' dashboard polls';render();renderMarketFeeds();await Promise.all(syms.map(async sym=>{try{await loadHistory(sym,true);draw(sym)}catch(_){}}))}catch(e){status.textContent='Dashboard connection error';dot.classList.add('off');time.textContent=e.message}}
 let loggedIn=false,pollTimer=null;
 const loginScreen=document.getElementById('loginScreen'),dashboard=document.getElementById('dashboard'),loginForm=document.getElementById('loginForm'),loginError=document.getElementById('loginError');
-function showDashboard(){loggedIn=true;loginScreen.style.display='none';dashboard.hidden=false;loadActivity();poll();if(!pollTimer)pollTimer=setInterval(()=>{if(loggedIn)poll()},3000)}
+function showDashboard(){loggedIn=true;loginScreen.style.display='none';dashboard.hidden=false;loadActivity();loadTradeAssistant();poll();if(!pollTimer)pollTimer=setInterval(()=>{if(loggedIn)poll()},3000)}
 loginForm.addEventListener('submit',async e=>{e.preventDefault();loginError.textContent='';let b=loginForm.querySelector('button[type=submit]');b.disabled=true;b.textContent='Signing in…';try{let r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:document.getElementById('loginUser').value,password:document.getElementById('loginPass').value})});let d=await r.json();if(!r.ok)throw Error(d.error||'Unable to sign in');showDashboard()}catch(err){loginError.textContent=err.message||'Incorrect username or password'}finally{b.disabled=false;b.textContent='Sign in'}});
 document.getElementById('togglePassword').onclick=()=>{let p=document.getElementById('loginPass'),b=document.getElementById('togglePassword');p.type=p.type==='password'?'text':'password';b.textContent=p.type==='password'?'Show':'Hide'};
 document.getElementById('logoutBtn').onclick=async()=>{try{await fetch('/api/logout',{method:'POST'})}catch{}loggedIn=false;dashboard.hidden=true;loginScreen.style.display='flex';loginForm.reset();loginError.textContent='You have signed out.'};
 async function checkSession(){try{let r=await fetch('/api/state',{cache:'no-store'});if(r.ok){showDashboard();return}}catch{}loginScreen.style.display='flex';dashboard.hidden=true}
-makeCards();document.getElementById('card-'+selectedSym).classList.add('selected');for(const sym of syms){let cv=document.getElementById('chart-'+sym);cv.addEventListener('mousemove',e=>hoverChart(sym,e.clientX));cv.addEventListener('mouseleave',()=>clearHover(sym));cv.addEventListener('touchstart',e=>{if(e.touches[0])hoverChart(sym,e.touches[0].clientX)},{passive:true});cv.addEventListener('touchmove',e=>{if(e.touches[0])hoverChart(sym,e.touches[0].clientX)},{passive:true});cv.addEventListener('touchend',()=>setTimeout(()=>clearHover(sym),900),{passive:true})}
-document.getElementById('cards').addEventListener('click',async e=>{let card=e.target.closest('.coin');if(card){let sym=card.id.replace('card-','');if(sym!==selectedSym){selectedSym=sym;document.querySelectorAll('.coin').forEach(x=>x.classList.toggle('selected',x.id==='card-'+sym));document.getElementById('cards').prepend(card);syms.forEach(draw)}}let b=e.target.closest('.chartcontrols button');if(!b)return;let controls=b.closest('.chartcontrols'),sym=controls.id.replace('controls-','');chartRange[sym]=b.dataset.r;controls.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));await loadHistory(sym,true);draw(sym)});
+makeCards();for(const sym of syms){let cv=document.getElementById('chart-'+sym);cv.addEventListener('mousemove',e=>hoverChart(sym,e.clientX));cv.addEventListener('mouseleave',()=>clearHover(sym));cv.addEventListener('touchstart',e=>{if(e.touches[0])hoverChart(sym,e.touches[0].clientX)},{passive:true});cv.addEventListener('touchmove',e=>{if(e.touches[0])hoverChart(sym,e.touches[0].clientX)},{passive:true});cv.addEventListener('touchend',()=>setTimeout(()=>clearHover(sym),900),{passive:true})}
+document.getElementById('cards').addEventListener('click',async e=>{let card=e.target.closest('.coin');let b=e.target.closest('.chartcontrols button');if(!b)return;let controls=b.closest('.chartcontrols'),sym=controls.id.replace('controls-','');chartRange[sym]=b.dataset.r;controls.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));await loadHistory(sym,true);draw(sym)});
 document.getElementById('csv').onclick=()=>location.href='/api/export.csv';
 importBtn.onclick=()=>importFile.click();importFile.onchange=async()=>{let f=importFile.files&&importFile.files[0];if(!f)return;if(!confirm('Merge '+f.name+' into the cloud tracker? Existing data will be preserved and a database backup will be created first.')){importFile.value='';return}try{status.textContent='Importing…';let r=await fetch('/api/import',{method:'POST',headers:{'Content-Type':'text/csv'},body:await f.arrayBuffer()});let d=await r.json();if(!r.ok)throw Error(d.error||('HTTP '+r.status));alert(`Import complete\n\n${d.priceRecordsAdded} price records added\n${d.eventsAdded} extrema events added\n${d.duplicatesSkipped} duplicates skipped\n${d.cryptosUpdated} cryptos updated\n\nBackup: ${d.backup}`);historyCache={};await poll()}catch(e){alert('Import failed: '+e.message);status.textContent='Import failed'}finally{importFile.value=''}};
 
@@ -305,16 +326,37 @@ async function openPlayer(name,id){
 }
 function drawProfile(hist){let cv=document.getElementById('profileChart');if(!cv||!hist.length)return;let ctx=cv.getContext('2d'),w=cv.clientWidth,h=cv.clientHeight;cv.width=w*devicePixelRatio;cv.height=h*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);let vals=hist.map(x=>Number(typeof x==='number'?x:(x.netWorth??x.balance??x.value))).filter(Number.isFinite);if(vals.length<2)return;let lo=Math.min(...vals),hi=Math.max(...vals),pad=(hi-lo)*.1||1;ctx.strokeStyle='#20c982';ctx.lineWidth=2;ctx.beginPath();vals.forEach((v,i)=>{let x=i/(vals.length-1)*w,y=5+(hi+pad-v)/(hi-lo+2*pad)*(h-10);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}
 
+async function loadTradeAssistant(){
+ try{
+  const data=await apiJson('/api/trade-assistant');
+  const el=document.getElementById('tradeAssistant');
+  const items=Array.isArray(data.coins)?data.coins:[];
+  el.innerHTML=items.length?items.map(x=>{
+   const action=x.action||'WAIT',good=action==='UP SETUP',bad=action==='DOWN SETUP';
+   const cls=good?'up':bad?'down':'';
+   const price=x.price!=null?fmt(x.price):'—';
+   const level=v=>v==null?'Not available':fmt(v);
+   const rr=x.riskReward==null?'Not available':Number(x.riskReward).toFixed(2)+':1';
+   const reasons=(x.reasons||[]).map(v=>safeText(v)).join(' · ');
+   return `<article class="assistant-card"><h3>${safeText(x.symbol)} <span class="signal ${cls}">${safeText(action)}</span></h3>
+   <div class="detail">Current <b>${price}</b> · Score <b>${Number(x.score||0)}/100</b></div>
+   <div class="detail">Entry zone <b>${x.entryLow!=null&&x.entryHigh!=null?level(x.entryLow)+' – '+level(x.entryHigh):'Not available'}</b></div>
+   <div class="detail">Target <b>${level(x.target)}</b> · Stop <b>${level(x.stop)}</b></div>
+   <div class="detail">Risk / reward <b>${rr}</b> · 24h move <b>${x.m24==null?'Unknown':pct(x.m24)}</b></div>
+   <div class="why">${reasons||'Insufficient stored data to assess the market.'}</div></article>`;
+  }).join(''):'<div class="empty">No price data available yet.</div>';
+ }catch(e){document.getElementById('tradeAssistant').innerHTML='<div class="empty">Trade analysis unavailable; market history may still be collecting.</div>'}
+}
 function renderMarketFeeds(){
  let evs=Object.entries(window.latestEvents||{}).map(([symbol,e])=>({symbol,...e})).filter(x=>x.type);
  evs.sort((a,b)=>(b.ts||0)-(a.ts||0));
- let alerts=document.getElementById('alertsList'),hist=document.getElementById('marketHistory');
- if(!evs.length){alerts.innerHTML='<div class="empty">No new record alerts yet.</div>';hist.innerHTML='<div class="empty">Market events will appear as new records are detected.</div>';return}
+ let alerts=document.getElementById('alertsList');
+ if(!evs.length){alerts.innerHTML='<div class="empty">No new record alerts yet.</div>';return}
  alerts.innerHTML=evs.map(e=>`<div class="feed-row"><b>${e.symbol}</b><span class="${e.type==='NEW HIGH'?'up':'down'}">${e.type}</span><span>${fmt(e.price)}</span><span class="muted">${e.ts?new Date(e.ts).toLocaleString():''}</span></div>`).join('');
- hist.innerHTML=evs.map(e=>`<div class="feed-row"><b>${e.symbol}</b><span>${e.type}</span><span>${fmt(e.price)}</span><span class="muted">${e.ts?new Date(e.ts).toLocaleString():''}</span></div>`).join('');
+
 }
 
-loadActivity();setInterval(()=>{if(loggedIn){loadActivity();if(document.getElementById('page-leaderboards').classList.contains('active'))loadLeaderboard(leaderboardPeriod);if(document.getElementById('page-intelligence').classList.contains('active')||document.getElementById('page-scanner').classList.contains('active'))loadIntelligence()}},15000);
+loadActivity();setInterval(()=>{if(loggedIn){loadActivity();loadTradeAssistant();if(document.getElementById('page-leaderboards').classList.contains('active'))loadLeaderboard(leaderboardPeriod);if(document.getElementById('page-intelligence').classList.contains('active')||document.getElementById('page-scanner').classList.contains('active'))loadIntelligence()}},15000);
 
 addEventListener('resize',()=>syms.forEach(draw));checkSession();
 </script></body></html>

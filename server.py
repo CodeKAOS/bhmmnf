@@ -241,8 +241,77 @@ def intelligence():
             result.append({'symbol':sym,'m5':m5,'m15':m15,'h1':h1,'h24':h24,'trend':trend,'volatility':vol,'score':score,'highDistance':(high-price)/price*100 if price else 0,'lowDistance':(price-low)/low*100 if low else 0})
     return {'updatedAt':now,'coins':result}
 
+def trade_assistant():
+    """Conservative, transparent analysis of observed prices; never executes trades."""
+    now=int(time.time()*1000)
+    output=[]
+    with con() as c:
+        for sym in SYMS:
+            rows=c.execute('SELECT ts,price FROM prices WHERE symbol=? AND ts>=? ORDER BY ts',
+                           (sym,now-24*60*60_000)).fetchall()
+            points=[(int(r['ts']),float(r['price'])) for r in rows if r['price'] and r['price']>0]
+            if not points:
+                output.append({'symbol':sym,'action':'WAIT','score':0,'reasons':['No stored price samples yet']})
+                continue
+            price=points[-1][1]
+            span=points[-1][0]-points[0][0]
+            recent=[v for t,v in points if t>=now-60*60_000]
+            high=max(recent) if recent else price
+            low=min(recent) if recent else price
+            m5=period_change(c,sym,now,5*60_000,price) if span>=5*60_000 else None
+            m15=period_change(c,sym,now,15*60_000,price) if span>=15*60_000 else None
+            h1=period_change(c,sym,now,60*60_000,price) if span>=60*60_000 else None
+            m24=period_change(c,sym,now,24*60*60_000,price) if span>=24*60*60_000 else None
+            # Use 1-minute samples for volatility rather than 3-second ticks.
+            minute={}
+            for t,v in points:
+                if t>=now-60*60_000: minute[t//60_000]=v
+            series=list(minute.values())
+            returns=[(series[i]/series[i-1]-1)*100 for i in range(1,len(series)) if series[i-1]]
+            volatility=(sum(v*v for v in returns)/len(returns))**.5 if returns else None
+            enough=len(series)>=20 and span>=60*60_000 and h1 is not None and m15 is not None
+            action='WAIT'; score=0; entry_low=entry_high=target=stop=rr=None
+            reasons=[]
+            if not enough:
+                reasons.append('Need at least 1 hour of stored prices and 20 distinct minute samples')
+            elif high<=low:
+                reasons.append('Insufficient recent price range for support and resistance')
+            else:
+                aligned_up=m5 is not None and m5>0 and m15>0 and h1>0
+                aligned_down=m5 is not None and m5<0 and m15<0 and h1<0
+                width=high-low
+                score=max(0,min(100,round(45+min(22,abs(m15)*4)+min(18,abs(h1)*2)-min(25,(volatility or 0)*20))))
+                reasons.extend(['5m / 15m / 1h momentum '+('aligned upward' if aligned_up else 'aligned downward' if aligned_down else 'mixed'),
+                                '1h observed support '+format(low,'.6g')+'; resistance '+format(high,'.6g')])
+                if volatility is not None and volatility>2:
+                    reasons.append('Elevated minute-to-minute volatility: wait')
+                elif aligned_up and price<=high and (high-price)/price>=0.002:
+                    action='UP SETUP'
+                    entry_low=price*0.998;entry_high=price*1.002
+                    stop=low;target=high
+                    risk=price-stop;reward=target-price
+                    rr=reward/risk if risk>0 else None
+                elif aligned_down and price>=low and (price-low)/price>=0.002:
+                    action='DOWN SETUP'
+                    entry_low=price*0.998;entry_high=price*1.002
+                    stop=high;target=low
+                    risk=stop-price;reward=price-target
+                    rr=reward/risk if risk>0 else None
+                if action!='WAIT' and (rr is None or rr<1.5):
+                    action='WAIT';entry_low=entry_high=target=stop=rr=None
+                    reasons.append('Risk/reward below 1.5:1')
+                if action=='WAIT' and len(reasons)<3:
+                    reasons.append('No qualifying setup at the current price')
+            output.append({'symbol':sym,'price':price,'action':action,'score':score,
+                           'entryLow':round(entry_low,8) if entry_low is not None else None,
+                           'entryHigh':round(entry_high,8) if entry_high is not None else None,
+                           'target':target,'stop':stop,'riskReward':round(rr,2) if rr is not None else None,
+                           'm24':m24,'reasons':reasons})
+    output.sort(key=lambda x:(x['action']=='WAIT',-x['score']))
+    return {'updatedAt':now,'coins':output}
+
 def external_json(url):
-    req=Request(url,headers={'User-Agent':'Mozilla/5.0 BitcoinHero/23','Accept':'application/json'})
+    req=Request(url,headers={'User-Agent':'Mozilla/5.0 BitcoinHero/25','Accept':'application/json'})
     with urlopen(req,timeout=12) as r:
         raw=r.read(3_000_000)
         return json.loads(raw.decode('utf-8'))
@@ -308,6 +377,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.path='/tracker.html'; return super().do_GET()
         if not self.require_auth(): return
 
+        if u.path=='/api/trade-assistant':
+            try: return self.send_json(trade_assistant())
+            except Exception as e: return self.send_json({'error':str(e)},500)
         if u.path=='/api/intelligence':
             try: return self.send_json(intelligence())
             except Exception as e: return self.send_json({'error':str(e)},500)
@@ -328,7 +400,7 @@ class Handler(SimpleHTTPRequestHandler):
             player_id=u.path.rsplit('/',1)[-1]
             if not player_id or len(player_id)>160: return self.send_json({'error':'invalid player id'},400)
             try:
-                req=Request('https://bitcoinhero.me/api/users/'+quote(player_id,safe='')+'/avatar',headers={'User-Agent':'Mozilla/5.0 BitcoinHero/23'})
+                req=Request('https://bitcoinhero.me/api/users/'+quote(player_id,safe='')+'/avatar',headers={'User-Agent':'Mozilla/5.0 BitcoinHero/25'})
                 with urlopen(req,timeout=12) as r:
                     body=r.read(2_000_000); self.send_response(r.status); self.send_header('Content-Type',r.headers.get('Content-Type','image/png')); self.send_header('Cache-Control','public, max-age=300'); self.send_header('Content-Length',str(len(body))); self.end_headers(); return self.wfile.write(body)
             except Exception: return self.send_json({'error':'avatar unavailable'},404)
@@ -345,5 +417,5 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__=='__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__))); init_db(); bootstrap_candles(); threading.Thread(target=collector,daemon=True).start()
-    print(f'Bitcoin Hero Northflank Tracker v24 on 0.0.0.0:{PORT}; DB={DB}')
+    print(f'Bitcoin Hero Northflank Tracker v25 on 0.0.0.0:{PORT}; DB={DB}')
     ThreadingHTTPServer((HOST,PORT),Handler).serve_forever()
