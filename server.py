@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
 REMOTE=os.getenv('BITCOIN_HERO_API','https://api.bitcoinhero.me/api/prices')
 PORT=int(os.getenv('PORT','8000')); HOST=os.getenv('HOST','0.0.0.0')
@@ -12,6 +13,10 @@ AUTH_PASS=os.getenv('TRACKER_PASSWORD','')
 DATA_DIR=os.getenv('DATA_DIR','/data' if os.path.isdir('/data') else os.path.join(os.path.dirname(__file__),'data'))
 os.makedirs(DATA_DIR, exist_ok=True); DB=os.path.join(DATA_DIR,'bitcoin_hero.sqlite3')
 SYMS=['BTC','ETH','SOL','DOGE','XRP','ADA','LINK','AVAX']
+# Cache upstream 404s by player ID for 24 hours to avoid repeated avatar requests.
+AVATAR_NOT_FOUND={}
+AVATAR_CACHE_TTL=24*60*60
+avatar_cache_lock=threading.Lock()
 BASE={'BTC': (67620.74, 102652.3283235368), 'ETH': (3360.5842984163146, 5640.140525), 'SOL': (654.08, 1299.19615215442), 'DOGE': (0.0437, 0.3305090875513101), 'XRP': (0.3017977083568663, 0.9173), 'ADA': (0.3401675692355668, 0.6635), 'LINK': (1.85625, 4.15), 'AVAX': (62.25, 167.0230490349094)}
 lock=threading.RLock(); runtime={'ok':False,'last_error':None,'last_poll':None,'tick_ms':3000}
 SESSIONS={}; SESSION_LOCK=threading.RLock(); SESSION_TTL=12*3600
@@ -303,11 +308,23 @@ class Handler(SimpleHTTPRequestHandler):
         if u.path.startswith('/api/avatar/'):
             player_id=u.path.rsplit('/',1)[-1]
             if not player_id or len(player_id)>160: return self.send_json({'error':'invalid player id'},400)
-            try:
-                req=Request('https://api.bitcoinhero.me/api/users/'+quote(player_id,safe='')+'/avatar',headers={'User-Agent':'Mozilla/5.0 BitcoinHero/26'})
-                with urlopen(req,timeout=12) as r:
-                    body=r.read(2_000_000); self.send_response(r.status); self.send_header('Content-Type',r.headers.get('Content-Type','image/png')); self.send_header('Cache-Control','public, max-age=300'); self.send_header('Content-Length',str(len(body))); self.end_headers(); return self.wfile.write(body)
-            except Exception: return self.send_json({'error':'avatar unavailable'},404)
+            now=time.time()
+            with avatar_cache_lock:
+                expiry=AVATAR_NOT_FOUND.get(player_id,0)
+                if expiry>now:
+                    self.send_response(404); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control',f'public, max-age={int(expiry-now)}'); self.send_header('Content-Length','0'); self.end_headers(); return
+                try:
+                    req=Request('https://api.bitcoinhero.me/api/users/'+quote(player_id,safe='')+'/avatar',headers={'User-Agent':'Mozilla/5.0 BitcoinHero/27','Accept':'image/*'})
+                    with urlopen(req,timeout=12) as r:
+                        body=r.read(2_000_000)
+                        self.send_response(r.status); self.send_header('Content-Type',r.headers.get('Content-Type','image/png')); self.send_header('Cache-Control','public, max-age=3600'); self.send_header('Content-Length',str(len(body))); self.end_headers(); return self.wfile.write(body)
+                except HTTPError as e:
+                    if e.code==404:
+                        AVATAR_NOT_FOUND[player_id]=now+AVATAR_CACHE_TTL
+                        self.send_response(404); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control',f'public, max-age={AVATAR_CACHE_TTL}'); self.send_header('Content-Length','0'); self.end_headers(); return
+                    return self.send_json({'error':'avatar upstream unavailable'},502)
+                except Exception:
+                    return self.send_json({'error':'avatar upstream unavailable'},502)
 
         if u.path=='/api/state': return self.send_json(latest_state())
         if u.path=='/api/history':

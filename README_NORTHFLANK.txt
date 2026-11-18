@@ -71,3 +71,12 @@ V26 changes:
 - Corrected the upstream production API host to https://api.bitcoinhero.me for prices, activity, leaderboards, player profiles and avatars.
 - Header tagline removed, connection status reads Connected, and logout is an icon-only button with an accessible label and tooltip.
 - Existing persistent SQLite data and schema are retained. Do not delete or recreate /data.
+
+
+V27 avatar handling:
+- Player avatars are requested through /api/avatar/{playerId}.
+- A successful avatar response is cached by browsers for one hour.
+- An upstream 404 is negative-cached by player ID for 24 hours by the tracker server and returned with an explicit Cache-Control max-age, avoiding repeated upstream requests for the same missing avatar.
+- The frontend remembers failed avatar IDs for the current page session and displays a circular single-letter username initial (e.g. T for Tacopilot) instead of retrying.
+- Player profiles use the same fallback behavior.
+- Non-404 upstream failures return 502 and are not treated as proof that an avatar does not exist.

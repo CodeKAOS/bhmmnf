@@ -233,9 +233,13 @@ function safeText(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<
 function playerName(x){return x.username||x.playerName||x.name||x.player?.username||'Player'}
 function playerId(x){return x.playerId||x.userId||x.id||x.player?.id||x.user?.id||''}
 function coinSym(x){return String(x.symbol||x.coin||x.crypto||'BTC').toUpperCase()}
+const failedAvatarIds=new Set();
 function avatarUrl(id){return id?'/api/avatar/'+encodeURIComponent(id):''}
-function initials(name){return String(name||'P').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase()||'P'}
-function avatarHtml(x,size=32){let id=playerId(x),name=playerName(x),url=avatarUrl(id);return url?`<img class="coin-logo" width="${size}" height="${size}" src="${url}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'coin-logo',textContent:'${safeText(initials(name))}'}))">`:`<span class="coin-logo" style="display:grid;place-items:center;background:#35435b;color:white;font-weight:900;width:${size}px;height:${size}px">${safeText(initials(name))}</span>`}
+function initials(name){return (String(name||'P').trim().charAt(0)||'P').toUpperCase()}
+function avatarFallback(name,size=32){return `<span class="coin-logo avatar-initial" style="display:grid;place-items:center;background:#35435b;color:white;font-weight:900;width:${size}px;height:${size}px;border-radius:50%">${safeText(initials(name))}</span>`}
+function avatarFailed(img,id,name,size){if(id)failedAvatarIds.add(String(id));img.replaceWith(Object.assign(document.createElement('span'),{className:'coin-logo avatar-initial',textContent:initials(name),style:`display:grid;place-items:center;background:#35435b;color:white;font-weight:900;width:${size}px;height:${size}px;border-radius:50%`}))}
+function avatarHtml(x,size=32){let id=String(playerId(x)||''),name=playerName(x),url=avatarUrl(id);return url&&!failedAvatarIds.has(id)?`<img class="coin-logo" width="${size}" height="${size}" src="${url}" onerror="avatarFailed(this,'${safeText(id)}','${safeText(name)}',${size})">`:avatarFallback(name,size)}
+function profileAvatarHtml(id,name){id=String(id||'');return id&&!failedAvatarIds.has(id)?`<img src="${avatarUrl(id)}" alt="" onerror="avatarFailed(this,'${safeText(id)}','${safeText(name)}',56)">`:safeText(initials(name))}
 function playerButton(x){let n=playerName(x),id=playerId(x);return `<button class="player-link" data-player="${safeText(n)}" data-playerid="${safeText(id)}">${safeText(n)}</button>`}
 function money(v){let n=Number(v);return Number.isFinite(n)?(n<0?'−':'')+'$'+Math.abs(n).toLocaleString(undefined,{maximumFractionDigits:2}):'—'}
 async function loadActivity(){try{let d=await apiJson('/api/activity'),items=pickArray(d);let el=document.getElementById('activityList');if(!items.length){el.innerHTML='<div class="empty">No recent trades available.</div>';return}
@@ -350,7 +354,7 @@ async function openPlayer(name,id){
   content.innerHTML=`
    <div class="profile-card">
     <div style="display:flex;align-items:center;gap:12px">
-     <div class="profile-avatar">${avatar?`<img src="${avatar}" alt="" onerror="this.remove();this.parentElement.textContent='${safeText(initials(username))}'">`:safeText(initials(username))}</div>
+     <div class="profile-avatar">${profileAvatarHtml(avatarId,username)}</div>
      <div><h2 style="margin:0">${safeText(username)}</h2>
       <div style="color:#f4bd4d;font-weight:800">${safeText(tier.charAt(0).toUpperCase()+tier.slice(1))} · Level ${safeText(levelNum)}</div>
       <div class="muted">Trading since ${safeText(joined||'—')}${Number.isFinite(rank)&&rank>0?' · Rank #'+rank.toLocaleString():''}</div>
