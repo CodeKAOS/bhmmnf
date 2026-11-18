@@ -221,59 +221,79 @@ importBtn.onclick=()=>importFile.click();importFile.onchange=async()=>{let f=imp
 
 // Bitcoin Hero v26 navigation and social/player features
 let leaderboardPeriod='month',currentPlayerReturn='leaderboards';
+const leaderboardCache={month:null,all:null};
+const leaderboardFailed=new Set();
+let leaderboardRefreshBusy=false;
 const logoEmoji={BTC:'₿',ETH:'◆',SOL:'≋',DOGE:'Ð',XRP:'X',ADA:'⠿',LINK:'⬡',AVAX:'▲'};
 const logoClass={BTC:'btc',ETH:'eth',SOL:'sol',DOGE:'doge',XRP:'xrp',ADA:'ada',LINK:'link',AVAX:'avax'};
 function coinIcon(sym){sym=String(sym||'BTC').toUpperCase();return `<span class="coinlogo ${logoClass[sym]||'btc'}">${logoEmoji[sym]||'₿'}</span>`}
-function showPage(name){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+name));document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.page===name));if(name==='leaderboards')loadLeaderboard(leaderboardPeriod)}
+function showPage(name){document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id==='page-'+name));document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.page===name));if(name==='leaderboards'){renderLeaderboard(leaderboardPeriod);refreshLeaderboards()}}
 document.getElementById('mainNav').addEventListener('click',e=>{let b=e.target.closest('[data-page]');if(b)showPage(b.dataset.page)});
-document.querySelector('.subtabs').addEventListener('click',e=>{let b=e.target.closest('[data-period]');if(!b)return;leaderboardPeriod=b.dataset.period;document.querySelectorAll('.subtab').forEach(x=>x.classList.toggle('active',x===b));loadLeaderboard(leaderboardPeriod)});
+document.querySelector('.subtabs').addEventListener('click',e=>{let b=e.target.closest('[data-period]');if(!b)return;leaderboardPeriod=b.dataset.period;document.querySelectorAll('.subtab').forEach(x=>x.classList.toggle('active',x===b));renderLeaderboard(leaderboardPeriod)});
 async function apiJson(url){let r=await fetch(url,{cache:'no-store'});let d=await r.json();if(!r.ok)throw Error(d.error||'API request failed');return d}
 function pickArray(d){if(Array.isArray(d))return d;for(let k of ['activity','trades','items','data','players','leaderboard','results'])if(Array.isArray(d?.[k]))return d[k];return []}
 function safeText(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function playerName(x){return x.username||x.playerName||x.name||x.player?.username||'Player'}
 function playerId(x){return x.playerId||x.userId||x.id||x.player?.id||x.user?.id||''}
 function coinSym(x){return String(x.symbol||x.coin||x.crypto||'BTC').toUpperCase()}
-const failedAvatarIds=new Set();
 function avatarUrl(id){return id?'/api/avatar/'+encodeURIComponent(id):''}
-function initials(name){return (String(name||'P').trim().charAt(0)||'P').toUpperCase()}
-function avatarFallback(name,size=32){return `<span class="coin-logo avatar-initial" style="display:grid;place-items:center;background:#35435b;color:white;font-weight:900;width:${size}px;height:${size}px;border-radius:50%">${safeText(initials(name))}</span>`}
-function avatarFailed(img,id,name,size){if(id)failedAvatarIds.add(String(id));img.replaceWith(Object.assign(document.createElement('span'),{className:'coin-logo avatar-initial',textContent:initials(name),style:`display:grid;place-items:center;background:#35435b;color:white;font-weight:900;width:${size}px;height:${size}px;border-radius:50%`}))}
-function avatarHtml(x,size=32){let id=String(playerId(x)||''),name=playerName(x),url=avatarUrl(id);return url&&!failedAvatarIds.has(id)?`<img class="coin-logo" width="${size}" height="${size}" src="${url}" onerror="avatarFailed(this,'${safeText(id)}','${safeText(name)}',${size})">`:avatarFallback(name,size)}
-function profileAvatarHtml(id,name){id=String(id||'');return id&&!failedAvatarIds.has(id)?`<img src="${avatarUrl(id)}" alt="" onerror="avatarFailed(this,'${safeText(id)}','${safeText(name)}',56)">`:safeText(initials(name))}
+function initials(name){return String(name||'P').trim().charAt(0).toUpperCase()||'P'}
+function avatarFallback(name,size=32){return `<span class="coin-logo" style="display:grid;place-items:center;background:#35435b;color:white;font-weight:900;width:${size}px;height:${size}px;border-radius:50%">${safeText(initials(name))}</span>`}
+function avatarHtml(x,size=32){let id=String(playerId(x)||''),name=playerName(x),url=avatarUrl(id);if(!url||leaderboardFailed.has(id))return avatarFallback(name,size);return `<img class="coin-logo" width="${size}" height="${size}" style="border-radius:50%;object-fit:cover" src="${url}" onerror="leaderboardAvatarFailed(this,'${safeText(id)}','${safeText(name)}',${size})">`}
+function leaderboardAvatarFailed(img,id,name,size){if(id)leaderboardFailed.add(String(id));img.replaceWith(Object.assign(document.createElement('span'),{className:'coin-logo',textContent:initials(name),style:`display:grid;place-items:center;background:#35435b;color:white;font-weight:900;width:${size}px;height:${size}px;border-radius:50%`}))}
 function playerButton(x){let n=playerName(x),id=playerId(x);return `<button class="player-link" data-player="${safeText(n)}" data-playerid="${safeText(id)}">${safeText(n)}</button>`}
 function money(v){let n=Number(v);return Number.isFinite(n)?(n<0?'−':'')+'$'+Math.abs(n).toLocaleString(undefined,{maximumFractionDigits:2}):'—'}
+function leaderboardMoney(v,period){let n=Number(v);if(!Number.isFinite(n))return '—';return period==='month'?(n>=0?'+':'−')+'$'+Math.abs(n).toLocaleString(undefined,{maximumFractionDigits:0}):money(n)}
 async function loadActivity(){try{let d=await apiJson('/api/activity'),items=pickArray(d);let el=document.getElementById('activityList');if(!items.length){el.innerHTML='<div class="empty">No recent trades available.</div>';return}
-el.innerHTML=items.map(x=>{let sym=coinSym(x),pnl=Number(x.pnl??x.profitLoss??x.profit??x.amount??0),name=playerName(x),id=playerId(x);return `<div class="activity-row">${coinIcon(sym)}${avatarHtml(x,30)}<div style="min-width:0"><div>${playerButton(x)}</div></div><span class="pnl ${pnl>=0?'up':'down'}">${pnl>=0?'+':'−'}${money(Math.abs(pnl))}</span></div>`}).join('')}catch(e){document.getElementById('activityList').innerHTML='<div class="empty">Live activity is temporarily unavailable.</div>'}}
-function pct(v){let n=Number(v);return Number.isFinite(n)?(n>=0?'+':'')+n.toFixed(2)+'%':'—'}
-function leaderboardValue(x){return x.netWorth??x.net_worth??x.balance??x.profit??x.pnl??x.totalProfit??x.total_profit}
+el.innerHTML=items.map(x=>{let sym=coinSym(x),pnl=Number(x.pnl??x.profitLoss??x.profit??x.amount??0),name=playerName(x);return `<div class="activity-row">${coinIcon(sym)}${avatarHtml(x,30)}<div style="min-width:0"><div>${playerButton(x)}</div></div><span class="pnl ${pnl>=0?'up':'down'}">${pnl>=0?'+':'−'}${money(Math.abs(pnl))}</span></div>`}).join('')}catch(e){document.getElementById('activityList').innerHTML='<div class="empty">Live activity is temporarily unavailable.</div>'}}
+function leaderboardValue(x,period){const v=period==='month'?x.monthlyPnl:x.netWorth;return v===null||v===undefined||v===''?NaN:v}
 function leaderboardLevel(x){let v=x.level;return v&&typeof v==='object'?(v.level??''):v??x.levelNumber??''}
-function podiumPlayer(x,rank){
- const name=playerName(x),id=playerId(x),level=leaderboardLevel(x);
- return `<button class="podium-player rank-${rank}" data-player="${safeText(name)}" data-playerid="${safeText(id)}" type="button">
- <span class="podium-avatar">${avatarHtml(x,rank===1?72:56)}</span><span class="podium-rank">${rank}</span>
- <strong>${safeText(name)}</strong><span class="podium-level">${level!==''?'Level '+safeText(level):''}</span>
- <span class="podium-value">${money(leaderboardValue(x))}</span></button>`;
+function leaderboardTrades(x){return x.monthlyTrades}
+function normaliseLeaderboard(data,period){
+ const rows=pickArray(data).filter(x=>x&&typeof x==='object').map((x,originalIndex)=>({...x,__value:Number(leaderboardValue(x,period)),__originalIndex:originalIndex}));
+ // The game API defines monthlyPnl and netWorth as the respective ranking metrics.
+ // Never substitute balance/net worth for monthly profit (or vice versa).
+ rows.sort((a,b)=>{
+  const av=Number.isFinite(a.__value),bv=Number.isFinite(b.__value);
+  if(av!==bv)return av?-1:1;
+  if(av&&bv&&a.__value!==b.__value)return b.__value-a.__value;
+  const ar=Number(a.rank),br=Number(b.rank);
+  if(Number.isFinite(ar)&&Number.isFinite(br)&&ar!==br)return ar-br;
+  return a.__originalIndex-b.__originalIndex;
+ });
+ return rows.map((x,i)=>({...x,__displayRank:i+1}));
 }
-async function loadLeaderboard(period){
- try{
-  const d=await apiJson('/api/leaderboard?period='+encodeURIComponent(period));
-  const items=pickArray(d).slice().sort((a,b)=>{
-   const ra=Number(a.rank),rb=Number(b.rank);
-   if(Number.isFinite(ra)&&Number.isFinite(rb)&&ra!==rb)return ra-rb;
-   if(Number.isFinite(ra)!==Number.isFinite(rb))return Number.isFinite(ra)?-1:1;
-   return Number(leaderboardValue(b)||0)-Number(leaderboardValue(a)||0);
-  });
-  const el=document.getElementById('leaderboardList');
-  if(!items.length){el.innerHTML='<div class="empty">No leaderboard entries returned for this period.</div>';return}
-  const top=items.slice(0,3),rest=items.slice(3);
-  const rankOf=(x,i)=>Number(x.rank)>0?Number(x.rank):i+1;
-  const podium=top.length?`<div class="podium">${(top.length===3?[top[1],top[0],top[2]]:top).map(x=>podiumPlayer(x,rankOf(x,items.indexOf(x)))).join('')}</div>`:'';
-  const rows=rest.map((x,i)=>{
-   const rank=rankOf(x,i+3),level=leaderboardLevel(x);
-   return `<button class="leader-row" data-player="${safeText(playerName(x))}" data-playerid="${safeText(playerId(x))}" type="button"><span class="ranknum">${rank}</span>${avatarHtml(x,36)}<div class="leader-person"><strong>${safeText(playerName(x))}</strong><span class="activity-meta">${level!==''?'Level '+safeText(level):'Player'}</span></div><span class="leader-value">${money(leaderboardValue(x))}</span></button>`;
-  }).join('');
-  el.innerHTML=podium+(rows?`<div class="leaderboard-rest">${rows}</div>`:'');
- }catch(e){document.getElementById('leaderboardList').innerHTML='<div class="empty">Leaderboard is temporarily unavailable. Please try again.</div>'}
+function podiumPlayer(x,period){
+ const rank=x.__displayRank,name=playerName(x),level=leaderboardLevel(x);
+ return `<button class="podium-player rank-${rank}" data-player="${safeText(name)}" data-playerid="${safeText(playerId(x))}" type="button"><span class="podium-avatar">${avatarHtml(x,rank===1?72:56)}</span><span class="podium-rank">${rank}</span><strong>${safeText(name)}</strong><span class="podium-level">${level!==''?'Level '+safeText(level):''}</span><span class="podium-value ${period==='month'?(x.__value>=0?'up':'down'):''}">${leaderboardMoney(x.__value,period)}</span></button>`;
+}
+function renderLeaderboard(period){
+ const el=document.getElementById('leaderboardList'),items=leaderboardCache[period];
+ if(!items){if(!el.dataset.hasContent)el.innerHTML='<div class="empty">Loading leaderboard…</div>';return}
+ if(!items.length){el.innerHTML='<div class="empty">No leaderboard entries returned for this period.</div>';el.dataset.hasContent='1';return}
+ const top=items.slice(0,3),rest=items.slice(3);
+ const podium=top.length?`<div class="podium">${(top.length===3?[top[1],top[0],top[2]]:top).map(x=>podiumPlayer(x,period)).join('')}</div>`:'';
+ const rows=rest.map(x=>{
+  const level=leaderboardLevel(x),trades=leaderboardTrades(x);
+  const sub=period==='month'&&trades!=null?`${safeText(trades)} ${Number(trades)===1?'trade':'trades'}`:(level!==''?'Level '+safeText(level):'Player');
+  return `<button class="leader-row" data-player="${safeText(playerName(x))}" data-playerid="${safeText(playerId(x))}" type="button"><span class="ranknum">${x.__displayRank}</span>${avatarHtml(x,36)}<div class="leader-person"><strong>${safeText(playerName(x))}</strong><span class="activity-meta">${sub}</span></div><span class="leader-value ${period==='month'?(x.__value>=0?'up':'down'):''}">${leaderboardMoney(x.__value,period)}</span></button>`;
+ }).join('');
+ el.innerHTML=podium+(rows?`<div class="leaderboard-rest">${rows}</div>`:'');el.dataset.hasContent='1';
+}
+async function refreshLeaderboards(){
+ if(leaderboardRefreshBusy)return;leaderboardRefreshBusy=true;
+ // Start both independent requests together; a failure in one must not discard the other's success.
+ const results=await Promise.allSettled([apiJson('/api/leaderboard?period=month'),apiJson('/api/leaderboard?period=all')]);
+ for(const [i,period] of ['month','all'].entries()){
+  const result=results[i];
+  if(result.status==='fulfilled'){
+   const rows=normaliseLeaderboard(result.value,period);
+   if(rows.length)leaderboardCache[period]=rows;
+   else if(!leaderboardCache[period])leaderboardCache[period]=[];
+  }
+ }
+ leaderboardRefreshBusy=false;
+ if(document.getElementById('page-leaderboards').classList.contains('active'))renderLeaderboard(leaderboardPeriod);
 }
 document.addEventListener('click',e=>{let p=e.target.closest('[data-player]');if(p){let name=p.dataset.player,id=p.dataset.playerid;currentPlayerReturn=document.querySelector('.page.active')?.id.replace('page-','')||'leaderboards';openPlayer(name,id)}});
 document.getElementById('playerBack').onclick=()=>{document.getElementById('playerOverlay').hidden=true;showPage(currentPlayerReturn)};
@@ -354,7 +374,7 @@ async function openPlayer(name,id){
   content.innerHTML=`
    <div class="profile-card">
     <div style="display:flex;align-items:center;gap:12px">
-     <div class="profile-avatar">${profileAvatarHtml(avatarId,username)}</div>
+     <div class="profile-avatar">${avatar&& !leaderboardFailed.has(String(avatarId))?`<img src="${avatar}" alt="" onerror="leaderboardAvatarFailed(this,'${safeText(String(avatarId))}','${safeText(username)}',54)">`:safeText(initials(username))}</div>
      <div><h2 style="margin:0">${safeText(username)}</h2>
       <div style="color:#f4bd4d;font-weight:800">${safeText(tier.charAt(0).toUpperCase()+tier.slice(1))} · Level ${safeText(levelNum)}</div>
       <div class="muted">Trading since ${safeText(joined||'—')}${Number.isFinite(rank)&&rank>0?' · Rank #'+rank.toLocaleString():''}</div>
@@ -392,7 +412,7 @@ function renderMarketFeeds(){
 
 }
 
-loadActivity();setInterval(()=>{if(loggedIn){loadActivity();if(document.getElementById('page-leaderboards').classList.contains('active'))loadLeaderboard(leaderboardPeriod);}},15000);
+loadActivity();refreshLeaderboards();setInterval(()=>{if(loggedIn){loadActivity();refreshLeaderboards();}},10000);
 
 addEventListener('resize',()=>syms.forEach(draw));checkSession();
 </script></body></html>

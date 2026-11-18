@@ -314,7 +314,7 @@ class Handler(SimpleHTTPRequestHandler):
                 if expiry>now:
                     self.send_response(404); self.send_header('Content-Type','application/json; charset=utf-8'); self.send_header('Cache-Control',f'public, max-age={int(expiry-now)}'); self.send_header('Content-Length','0'); self.end_headers(); return
                 try:
-                    req=Request('https://api.bitcoinhero.me/api/users/'+quote(player_id,safe='')+'/avatar',headers={'User-Agent':'Mozilla/5.0 BitcoinHero/27','Accept':'image/*'})
+                    req=Request('https://api.bitcoinhero.me/api/users/'+quote(player_id,safe='')+'/avatar',headers={'User-Agent':'Mozilla/5.0 BitcoinHero/28','Accept':'image/*'})
                     with urlopen(req,timeout=12) as r:
                         body=r.read(2_000_000)
                         self.send_response(r.status); self.send_header('Content-Type',r.headers.get('Content-Type','image/png')); self.send_header('Cache-Control','public, max-age=3600'); self.send_header('Content-Length',str(len(body))); self.end_headers(); return self.wfile.write(body)

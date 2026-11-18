@@ -80,3 +80,18 @@ V27 avatar handling:
 - The frontend remembers failed avatar IDs for the current page session and displays a circular single-letter username initial (e.g. T for Tacopilot) instead of retrying.
 - Player profiles use the same fallback behavior.
 - Non-404 upstream failures return 502 and are not treated as proof that an avatar does not exist.
+
+
+VERSION 28 - LEADERBOARD ACCURACY AND REFRESH
+
+Leaderboard source mapping follows the original Bitcoin Hero game frontend (app.js):
+- Monthly ranking/value: monthlyPnl (signed monthly profit), with monthlyTrades shown in the lower player rows.
+- All Time ranking/value: netWorth.
+- Player level: level (including level.level when supplied as an object).
+- Player identity and profile links use the API player id and username.
+
+The tracker requests both /api/leaderboard?period=month and /api/leaderboard?period=all concurrently on initial load, whenever the Leaderboards tab is opened, and every 10 seconds while logged in. Each period has its own in-memory cache. A failed request does not erase the last successful data for that period or prevent the other period from updating. The display is sorted by the period's actual metric (monthlyPnl or netWorth) before the podium and remaining rows are generated from the same sorted list.
+
+Avatar 404 handling: once an avatar fails in the browser, its player id is remembered for the session and initials are displayed on subsequent renders. The server caches upstream 404 responses for 24 hours.
+
+No production deployment is performed by creating this ZIP. Upload/deploy it to Northflank using the existing service configuration and persistent /data volume.
