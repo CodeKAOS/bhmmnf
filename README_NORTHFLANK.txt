@@ -1,54 +1,33 @@
-BITCOIN HERO TRACKER v21 — NORTHFLANK EDITION
-==============================================
+BITCOIN HERO TRACKER v22 — NORTHFLANK DEPLOYMENT
 
-Features retained / included
-- 24/7 server-side Bitcoin Hero simulated-price collector (~3 seconds)
-- Persistent SQLite history and hourly OHLC candles
-- Branded username/password login with HttpOnly session cookies protecting dashboard APIs
-- Graph-free dashboard: all eight coin cards are visible together, with no chart controls or graphs
-- Current prices, percentage changes, protected observed highs/lows, range bar, and potential range are shown for every coin
-- Existing historical price and candle data remain in the database; graphs are not displayed in this version
-- Observed highs/lows and timestamps remain independently protected and update on each poll
-- Potential UP/DOWN percentage range calculations
-- Cryptocurrency logos in place of gain-potential rings
-- CSV export
-- CSV Import & Merge: adds old tracker exports without replacing existing data
-- Duplicate price/event detection during import
-- Automatic SQLite backup before each import
-- Existing persistent database and observed extrema are preserved on upgrade
+Contents
+- server.py: authenticated Python HTTP server, 3-second server-side price collector, SQLite persistence, analytics and API proxy routes.
+- tracker.html: v22 dashboard with all eight coins, market analytics, heatmap, scanner, live activity, monthly/all-time leaderboards and player profiles.
+- Dockerfile / requirements.txt: container deployment files.
 
-NORTHFLANK DEPLOYMENT
-1. Extract this ZIP and upload the CONTENTS to the root of a private GitHub repository.
-2. In Northflank create a Developer Sandbox project.
-3. Create Service -> Combined service, select your repository and main branch.
-4. Build option: Dockerfile. Dockerfile path: /Dockerfile (root).
-5. Add runtime environment variables:
-      TRACKER_USERNAME = choose-a-username
-      TRACKER_PASSWORD = choose-a-long-random-password
-      DATA_DIR = /data
-      PORT = 8000
-   Do not put the password in GitHub.
-6. Networking: expose port 8000, protocol HTTP, accessibility Public.
-7. Add/retain a persistent volume mounted at /data. Keep the service at ONE replica because SQLite uses this single-writer volume.
-8. Deploy. Northflank will provide an HTTPS *.code.run address for the public port.
-9. Open the address. Your browser will request the username/password.
-10. The dashboard uses a branded sign-in page. Sessions expire after 12 hours; /api/health is available after login.
+Deploy
+1. Create/update the Northflank service from this ZIP or its repository.
+2. Expose HTTP port 8000.
+3. Attach a persistent volume mounted at /data. Do not remove or replace the existing volume: it contains bitcoin_hero.sqlite3 and protected historical records.
+4. Set TRACKER_USERNAME and TRACKER_PASSWORD to your login credentials.
+5. Optional: set BITCOIN_HERO_API to the price endpoint (default https://bitcoinhero.me/api/prices).
+6. Optional: set BITCOIN_HERO_API_ROOT (default https://bitcoinhero.me/api) if the public API root changes.
+7. Deploy and sign in.
 
-IMPORTING OLD DATA
-- In the dashboard click “Import & Merge CSV”.
-- Select any CSV exported by the tracker.
-- The server makes a database backup first, then merges price rows and extrema events.
-- Duplicate timestamp/price records are skipped.
-- Imported history is also folded into hourly candles.
-- Backups are stored on the /data persistent volume as backup-YYYYMMDD-HHMMSS.sqlite3.
+New authenticated endpoints
+- GET /api/analytics — 5m, 15m, 1h and 24h returns, trend, rolling volatility, reversal heuristic, distance from protected records and 0–100 heuristic score.
+- GET /api/activity — proxies /api/activity.
+- GET /api/leaderboard/month — proxies /api/leaderboard?period=month.
+- GET /api/leaderboard/all — proxies /api/leaderboard?period=all.
+- GET /api/players/{username} — proxies the URL-encoded player name.
 
-EXISTING DEPLOYMENTS — IMPORTANT
-- Keep the existing /data persistent volume mounted. Do not delete or replace it during deployment.
-- This v21 package is based on v20 and keeps the existing SQLite schema and collection logic. It does not delete existing raw prices, observed extrema, or events.
-- Existing extrema are not overwritten by BASE defaults when a database already exists.
-- The first candle backfill can take a little time if the database contains a long raw-price history.
+Data safety
+- Existing SQLite tables and records are retained; the server adds no destructive migration.
+- Protected historical lows/highs continue to be updated only by the existing collector and CSV merge rules. Analytics are calculated separately from raw price observations.
+- Server-side polling continues when the browser is closed, provided the Northflank service remains running.
+- Keep the /data persistent volume attached across redeployments.
 
-IMPORTANT
-- Bitcoin Hero prices are simulated, not real cryptocurrency market prices.
-- Potential-trade percentages are distances to observed tracker extrema, not forecasts.
-- A Northflank single-read/write persistent volume means one service replica. Do not scale this SQLite edition horizontally.
+Notes
+- Leaderboard/activity/profile JSON is rendered defensively across common response shapes. If the upstream API uses different field names or nested shapes, the layout may need a small mapping adjustment after inspecting live responses.
+- Signal score, trend, reversal and opportunity scanner are heuristic indicators, not financial advice or trading instructions.
+- This build restores the supplied server.py backend alongside the uploaded v21 ZIP, whose archive did not contain server.py even though its Dockerfile required it.

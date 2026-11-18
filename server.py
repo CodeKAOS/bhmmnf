@@ -2,10 +2,11 @@
 import base64, csv, hmac, io, json, os, shutil, sqlite3, threading, time, secrets, hashlib
 from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote, unquote
 from urllib.request import Request, urlopen
 
 REMOTE=os.getenv('BITCOIN_HERO_API','https://bitcoinhero.me/api/prices')
+API_ROOT=os.getenv('BITCOIN_HERO_API_ROOT','https://bitcoinhero.me/api').rstrip('/')
 PORT=int(os.getenv('PORT','8000')); HOST=os.getenv('HOST','0.0.0.0')
 AUTH_USER=os.getenv('TRACKER_USERNAME','admin')
 AUTH_PASS=os.getenv('TRACKER_PASSWORD','')
@@ -215,6 +216,35 @@ def csv_bytes():
             if p and r:w.writerow([datetime.fromtimestamp(p['ts']/1000,timezone.utc).isoformat(),s,'SNAPSHOT',p['price'],r['low'],r['high']])
     return b.getvalue().encode()
 
+def market_analytics():
+    now=int(time.time()*1000); windows={'5m':300000,'15m':900000,'1h':3600000,'24h':86400000}
+    result={}
+    with con() as c:
+        for sym in SYMS:
+            rows=c.execute('SELECT ts,price FROM prices WHERE symbol=? AND ts>=? ORDER BY ts',(sym,now-86400000-300000)).fetchall()
+            vals=[(int(r['ts']),float(r['price'])) for r in rows if r['price'] and float(r['price'])>0]
+            current=vals[-1][1] if vals else None; metrics={}
+            for key,ms in windows.items():
+                base=next((v for t,v in vals if t>=now-ms),None)
+                metrics[key]=((current/base-1)*100) if current is not None and base else None
+            returns=[]
+            for (_,a),(_,b) in zip(vals[-121:],vals[-120:]):
+                if a>0: returns.append((b/a-1)*100)
+            vol=(sum(x*x for x in returns)/len(returns))**.5 if returns else 0
+            ups=sum(1 for x in returns if x>0); downs=sum(1 for x in returns if x<0)
+            momentum=(metrics['5m'] or 0)*.35+(metrics['15m'] or 0)*.25+(metrics['1h'] or 0)*.25+(metrics['24h'] or 0)*.15
+            trend='UP' if momentum>0.08 else ('DOWN' if momentum< -0.08 else 'SIDEWAYS')
+            reversal=bool(len(returns)>=4 and ((returns[-1]>0.25 and sum(returns[-4:-1])< -0.25) or (returns[-1]<-0.25 and sum(returns[-4:-1])>0.25)))
+            rec=c.execute('SELECT low,high FROM records WHERE symbol=?',(sym,)).fetchone(); low=float(rec['low']) if rec else None; high=float(rec['high']) if rec else None
+            high_events=c.execute("SELECT COUNT(*) FROM events WHERE symbol=? AND type='NEW HIGH'",(sym,)).fetchone()[0]
+            low_events=c.execute("SELECT COUNT(*) FROM events WHERE symbol=? AND type='NEW LOW'",(sym,)).fetchone()[0]
+            recent_event=c.execute('SELECT ts,type,price FROM events WHERE symbol=? ORDER BY ts DESC LIMIT 1',(sym,)).fetchone()
+            distlow=((current/low-1)*100) if current and low else None; disthigh=((high/current-1)*100) if current and high else None
+            # Transparent heuristic score, not investment advice.
+            score=max(0,min(100,round(50+momentum*2+min(vol,5)*3+(10 if trend=='UP' else -10 if trend=='DOWN' else 0))))
+            result[sym]={'changes':metrics,'volatility':vol,'trend':trend,'momentum':momentum,'reversal':reversal,'distanceLowPct':distlow,'distanceHighPct':disthigh,'signalScore':score,'samples':len(vals),'newHighCount':high_events,'newLowCount':low_events,'latestRecordEvent':dict(recent_event) if recent_event else None}
+    return {'serverTime':now,'coins':result,'note':'Signal score is a heuristic indicator, not financial advice.'}
+
 class Handler(SimpleHTTPRequestHandler):
     def session_token(self):
         cookie=self.headers.get('Cookie','')
@@ -282,10 +312,24 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({'symbol':s,'range':rng,**history(s,rng)})
         if u.path=='/api/export.csv':
             body=csv_bytes(); self.send_response(200); self.send_header('Content-Type','text/csv'); self.send_header('Content-Disposition','attachment; filename="bitcoin-hero-cloud-snapshot.csv"'); self.send_header('Content-Length',str(len(body))); self.send_header('Cache-Control','no-store'); self.end_headers(); return self.wfile.write(body)
+        if u.path=='/api/analytics': return self.send_json(market_analytics())
+        if u.path in ('/api/activity','/api/leaderboard/month','/api/leaderboard/all') or u.path.startswith('/api/players/'):
+            if u.path=='/api/activity': remote_url=API_ROOT+'/activity'
+            elif u.path=='/api/leaderboard/month': remote_url=API_ROOT+'/leaderboard?period=month'
+            elif u.path=='/api/leaderboard/all': remote_url=API_ROOT+'/leaderboard?period=all'
+            else:
+                player=unquote(u.path[len('/api/players/'):]).strip('/')
+                if not player or len(player)>100: return self.send_json({'error':'Invalid player name'},400)
+                remote_url=API_ROOT+'/players/'+quote(player,safe='')
+            try:
+                req=Request(remote_url,headers={'User-Agent':'Mozilla/5.0 BitcoinHeroTracker/22','Accept':'application/json','x-avatars':'url','x-bh-platform':'web'})
+                with urlopen(req,timeout=10) as resp: payload=json.loads(resp.read().decode('utf-8'))
+                return self.send_json(payload,200,{'Access-Control-Allow-Origin':'same-origin'})
+            except Exception as e: return self.send_json({'error':'Upstream player service unavailable','detail':str(e)},502)
         if u.path=='/api/health': return self.send_json({'ok':runtime['ok'],'lastPoll':runtime['last_poll'],'error':runtime['last_error']})
         return self.send_json({'error':'not found'},404)
 
 if __name__=='__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__))); init_db(); bootstrap_candles(); threading.Thread(target=collector,daemon=True).start()
-    print(f'Bitcoin Hero Northflank Tracker v19 on 0.0.0.0:{PORT}; DB={DB}')
+    print(f'Bitcoin Hero Northflank Tracker v22 on 0.0.0.0:{PORT}; DB={DB}')
     ThreadingHTTPServer((HOST,PORT),Handler).serve_forever()
