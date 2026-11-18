@@ -147,10 +147,111 @@ async function loadLeaderboard(period){try{let d=await apiJson('/api/leaderboard
 el.innerHTML=items.map((x,i)=>`<div class="leader-row" data-player="${safeText(playerName(x))}" data-playerid="${safeText(playerId(x))}"><span class="ranknum">${x.rank||i+1}</span>${avatarHtml(x,34)}<div><div class="player-link">${safeText(playerName(x))}</div><div class="activity-meta">${safeText(x.level?('Level '+x.level):x.title||'Player')}</div></div><div class="leader-value">${money(x.netWorth??x.net_worth??x.balance??x.profit??x.pnl??x.totalProfit??x.total_profit)}</div></div>`).join('')}catch(e){document.getElementById('leaderboardList').innerHTML='<div class="empty">Leaderboard is temporarily unavailable.</div>'}}
 document.addEventListener('click',e=>{let p=e.target.closest('[data-player]');if(p){let name=p.dataset.player,id=p.dataset.playerid;currentPlayerReturn=document.querySelector('.page.active')?.id.replace('page-','')||'leaderboards';openPlayer(name,id)}});
 document.getElementById('playerBack').onclick=()=>{document.getElementById('playerOverlay').hidden=true;showPage(currentPlayerReturn)};
-function profileDate(v){if(v===null||v===undefined||v==='')return '—';let d=typeof v==='number'?new Date(v):new Date(String(v).replace(' ','T'));return Number.isNaN(d.getTime())?String(v):d.toLocaleString()}
-function profileLevel(v){if(v&&typeof v==='object')return `${v.level??'—'}${v.tier?' · '+String(v.tier).toUpperCase():''}`;return v??'—'}
-async function openPlayer(name,id){let overlay=document.getElementById('playerOverlay'),content=document.getElementById('playerContent');overlay.hidden=false;content.innerHTML='<div class="empty">Loading player profile…</div>';try{let d=await apiJson('/api/player?username='+encodeURIComponent(name)+(id?'&id='+encodeURIComponent(id):''));let x=d.player||d.user||d.profile||d;let net=Number(x.netWorth??x.balance??x.totalNetWorth);let start=Number(x.startCash??10000);let profit=Number.isFinite(net)?net-start:NaN;let profitPct=Number.isFinite(profit)&&start?profit/start*100:NaN;let wins=Number(x.wins),closed=Number(x.closed);let winRate=Number.isFinite(wins)&&Number.isFinite(closed)&&closed>0?(wins/closed*100).toFixed(2)+'%':(x.winRate!=null?Number(x.winRate).toFixed(2)+'%':'—');let curve=Array.isArray(x.curve)?x.curve.map(Number).filter(Number.isFinite):[];let hist=Array.isArray(x.recent)?x.recent:[];let achievements=Array.isArray(x.achievements)?x.achievements:[];let avatarId=id||x.id;let avatar=avatarId?avatarUrl(avatarId):'';let rankText=x.rank!=null?`#${Number(x.rank).toLocaleString()}${x.total!=null?' of '+Number(x.total).toLocaleString():''}`:'Player';let vals=[['WIN RATE',winRate],['TRADES',x.trades??'—'],['BEST TRADE',money(x.best)],['THIS MONTH',money(x.month)]];let historyRows=hist.map(t=>{let pnl=Number(t.pnl),dir=String(t.direction||'').toUpperCase();return `<div class="feed-row"><b>${safeText(t.symbol||'TRADE')}</b><span>${safeText(dir)}</span><span>${money(t.stake)}</span><span class="pnl ${pnl>=0?'up':'down'}">${pnl>=0?'+':'−'}${money(Math.abs(pnl))}</span><span class="muted">${safeText(profileDate(t.closedAt))}</span></div>`}).join('');content.innerHTML=`<div class="profile-card"><div style="display:flex;align-items:center;gap:12px"><div class="profile-avatar">${avatar?`<img src="${avatar}" onerror="this.remove();this.parentElement.textContent='${safeText(initials(name))}'">`:safeText(initials(name))}</div><div><h2 style="margin:0">${safeText(x.username||name)}</h2><div style="color:#f4bd4d;font-weight:800">${safeText(rankText)} · Level ${safeText(profileLevel(x.level))}</div><div class="muted">Trading since ${safeText(profileDate(x.createdAt))}</div></div></div><div class="muted" style="margin-top:18px">NET WORTH</div><div class="profile-net">${money(net)}</div><div class="${profit>=0?'up':'down'}">${money(profit)} (${Number.isFinite(profitPct)?(profitPct>=0?'+':'')+profitPct.toFixed(2)+'%':'—'}) all time</div><div style="height:90px;margin-top:10px"><canvas id="profileChart" style="width:100%;height:90px"></canvas></div><div class="profile-stats">${vals.map(v=>`<div class="profile-stat"><small>${v[0]}</small><b>${safeText(v[1])}</b></div>`).join('')}</div></div><section class="panel"><h3>HISTORY</h3>${historyRows||'<div class="empty">No recent trades supplied by the player API.</div>'}</section><section class="panel"><h3>ACHIEVEMENTS · ${achievements.filter(a=>a.unlocked).length}${x.achievementsTotal!=null?' / '+x.achievementsTotal:''}</h3><div class="muted" style="margin:0 0 10px">Unlocked achievements are identified from the public profile when available; unavailable status is not guessed.</div>${achievements.map(a=>`<div class="achievement-row"><span>${a.unlocked?'🏅':'🔒'}</span><div><b>${safeText(a.name||a.title||a.key||'Achievement')}</b><div class="muted">${safeText(a.desc||a.description||a.requirement||'')}</div></div></div>`).join('')||'<div class="empty">No achievements supplied by the player API.</div>'}</section>`;drawProfile(curve.map(v=>({value:start*(1+v/100)})))}catch(e){content.innerHTML='<div class="panel">Unable to load player profile. Please try again later.</div>'}}
-function drawProfile(hist){let cv=document.getElementById('profileChart');if(!cv||!hist.length)return;let ctx=cv.getContext('2d'),w=cv.clientWidth,h=cv.clientHeight;if(!w||!h)return;cv.width=w*devicePixelRatio;cv.height=h*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);let vals=hist.map(x=>Number(x.value??x.netWorth??x.balance)).filter(Number.isFinite);if(vals.length<2)return;let lo=Math.min(...vals),hi=Math.max(...vals),pad=(hi-lo)*.1||1;ctx.strokeStyle='#20c982';ctx.lineWidth=2;ctx.beginPath();vals.forEach((v,i)=>{let x=i/(vals.length-1)*w,y=5+(hi+pad-v)/(hi-lo+2*pad)*(h-10);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}
+
+const PROFILE_ACHIEVEMENTS = [
+ {key:'first_trade',name:'First Trade',desc:'Open your first trade'},
+ {key:'btc_believer',name:'Bitcoin Believer',desc:'Open a Bitcoin trade'},
+ {key:'diversified',name:'Diversified',desc:'Have trades open on 4 coins at once'},
+ {key:'whale',name:'Whale Move',desc:'Put $5,000+ on a single trade'},
+ {key:'profit_taker',name:'Profit Taker',desc:'Close a trade in profit'},
+ {key:'day_trader',name:'Day Trader',desc:'Open 10 trades'},
+ {key:'trade_machine',name:'Trade Machine',desc:'Open 50 trades'},
+ {key:'in_the_green',name:'In The Green',desc:'Grow your net worth to $11,000'},
+ {key:'to_the_moon',name:'To The Moon',desc:'Grow your net worth to $15,000'},
+ {key:'diamond_hands',name:'Diamond Hands',desc:'Grow your net worth to $20,000'},
+ {key:'first_lesson',name:'Student',desc:'Finish your first lesson'},
+ {key:'quick_study',name:'Quick Study',desc:'Finish 5 lessons'},
+ {key:'graduate',name:'Graduate',desc:'Finish every lesson'},
+ {key:'sharp',name:'Sharp',desc:'Answer 5 lesson questions right first time'},
+ {key:'recruiter',name:'Recruiter',desc:'A friend joins with your invite code'},
+ {key:'rekt',name:'Rekt',desc:'Drop below $5,000'}
+];
+function normalizeProfileAchievements(raw,total){
+ const list=Array.isArray(raw)?raw:[];
+ // The public /api/players/{username} endpoint returns earned achievement
+ // objects (key/name/desc), unlike the authenticated account endpoint which
+ // returns all definitions with an `unlocked` boolean.
+ const earned=new Map();
+ for(const a of list){
+   if(!a||typeof a!=='object')continue;
+   const key=String(a.key||a.id||'');
+   if(key)earned.set(key,a);
+ }
+ const catalog=PROFILE_ACHIEVEMENTS.map(def=>{
+   const a=earned.get(def.key);
+   return {...def,...(a||{}),key:def.key,unlocked:!!a};
+ });
+ // Preserve unfamiliar achievements returned by the server rather than drop them.
+ for(const a of list){
+   const key=String(a?.key||a?.id||'');
+   if(key&&!catalog.some(x=>x.key===key))catalog.push({...a,key,unlocked:true});
+ }
+ return {items:catalog,unlocked:earned.size,total:Math.max(Number(total)||0,catalog.length)};
+}
+function profileDate(v){
+ if(!v)return '';
+ const d=new Date(typeof v==='number'?v:(String(v).includes('T')?v:String(v).replace(' ','T')+'Z'));
+ return Number.isNaN(d.getTime())?'':d.toLocaleDateString();
+}
+async function openPlayer(name,id){
+ let overlay=document.getElementById('playerOverlay'),content=document.getElementById('playerContent');
+ overlay.hidden=false;content.innerHTML='<div class="empty">Loading player profile…</div>';
+ try{
+  let d=await apiJson('/api/player?username='+encodeURIComponent(name)+(id?'&id='+encodeURIComponent(id):''));
+  let x=d.player||d.user||d.profile||d;
+  let level=x.level&&typeof x.level==='object'?x.level:{level:x.level??x.levelNumber,tier:x.tier||x.rankTitle};
+  let net=Number(x.netWorth??x.net_worth??x.balance??x.totalNetWorth);
+  let startCash=Number(x.startCash??x.start_cash??10000);
+  let totalProfit=Number(x.totalProfit??x.profitAllTime??(Number.isFinite(net)?net-startCash:NaN));
+  let lifetimePct=Number.isFinite(Number(x.lifetimePercent??x.allTimePercent))?Number(x.lifetimePercent??x.allTimePercent):(startCash?totalProfit/startCash*100:NaN);
+  let curve=Array.isArray(x.curve)?x.curve:[];
+  let recent=Array.isArray(x.recent)?x.recent:pickArray(x.history||x.netWorthHistory||x.trades);
+  let achievementData=normalizeProfileAchievements(x.achievements,x.achievementsTotal);
+  let achievements=achievementData.items;
+  let avatarId=x.id??id;
+  let avatar=avatarId?avatarUrl(avatarId):'';
+  let rank=Number(x.rank);
+  let closed=Number(x.closed??x.closedTrades??0),wins=Number(x.wins??0);
+  let trades=Number(x.trades??x.totalTrades??x.tradesCount??x.tradeCount??0);
+  let winRate=closed>0?Math.round(wins/closed*100)+'%':'—';
+  let vals=[['WIN RATE',winRate],['TRADES',Number.isFinite(trades)?trades.toLocaleString():'—'],['BEST TRADE',money(x.best??x.bestTrade??x.best_trade)],['THIS MONTH',money(x.month??x.monthlyProfit??x.thisMonth??x.monthProfit)]];
+  let username=x.username||name;
+  let tier=String(level.tier||'bronze').toLowerCase();
+  let levelNum=level.level??'—';
+  let joined=profileDate(x.createdAt||x.joinedAt);
+  let status=x.status||x.tradingStatus||'';
+  let short=(v)=>money(v);
+  content.innerHTML=`
+   <div class="profile-card">
+    <div style="display:flex;align-items:center;gap:12px">
+     <div class="profile-avatar">${avatar?`<img src="${avatar}" alt="" onerror="this.remove();this.parentElement.textContent='${safeText(initials(username))}'">`:safeText(initials(username))}</div>
+     <div><h2 style="margin:0">${safeText(username)}</h2>
+      <div style="color:#f4bd4d;font-weight:800">${safeText(tier.charAt(0).toUpperCase()+tier.slice(1))} · Level ${safeText(levelNum)}</div>
+      <div class="muted">Trading since ${safeText(joined||'—')}${Number.isFinite(rank)&&rank>0?' · Rank #'+rank.toLocaleString():''}</div>
+      ${status?`<div class="muted">${safeText(status)}</div>`:''}
+     </div>
+    </div>
+    <div class="muted" style="margin-top:18px">NET WORTH</div>
+    <div class="profile-net">${money(net)}</div>
+    <div class="${totalProfit>=0?'up':'down'}">${money(totalProfit)} (${Number.isFinite(lifetimePct)?lifetimePct.toFixed(1)+'%':'—'}) all time</div>
+    <div style="height:90px;margin-top:10px"><canvas id="profileChart" style="width:100%;height:90px"></canvas></div>
+    <div class="profile-stats">${vals.map(v=>`<div class="profile-stat"><small>${v[0]}</small><b>${safeText(v[1])}</b></div>`).join('')}</div>
+   </div>
+   <section class="panel"><h3>HISTORY</h3>
+    ${recent.length?recent.slice(0,20).map(t=>{
+      let sym=t.symbol||t.coin||'TRADE',dir=String(t.direction||t.side||'').toUpperCase();
+      let stamp=profileDate(t.closedAt??t.createdAt??t.time);
+      let pnl=Number(t.pnl??t.profit??t.profitLoss);
+      return `<div class="feed-row"><b>${safeText(sym)}</b><span>${money(t.stake??t.value??t.amount)}</span><span class="muted">${safeText(dir)} ${safeText(stamp)}</span><span class="pnl ${pnl>=0?'up':'down'}">${money(pnl)}</span></div>`;
+    }).join(''):'<div class="empty">No recent trades supplied by the public profile.</div>'}
+   </section>
+   <section class="panel"><h3>ACHIEVEMENTS · ${achievementData.unlocked}/${achievementData.total}</h3>
+    ${achievements.map(a=>`<div class="achievement-row ${a.unlocked?'unlocked':'locked'}"><span>${a.unlocked?'🏅':'🔒'}</span><div><b>${safeText(a.name||a.title||a.key)}</b><div class="muted">${safeText(a.desc||a.description||a.requirement||'')}</div>${a.unlockedAt?`<div class="muted">Unlocked ${safeText(profileDate(a.unlockedAt))}</div>`:''}</div></div>`).join('')}
+   </section>`;
+  drawProfile(curve.length?curve.map(v=>({value:v})):recent);
+ }catch(e){content.innerHTML='<div class="panel">Unable to load player profile. '+safeText(e.message||'Please try again later.')+'</div>'}
+}
+function drawProfile(hist){let cv=document.getElementById('profileChart');if(!cv||!hist.length)return;let ctx=cv.getContext('2d'),w=cv.clientWidth,h=cv.clientHeight;cv.width=w*devicePixelRatio;cv.height=h*devicePixelRatio;ctx.scale(devicePixelRatio,devicePixelRatio);let vals=hist.map(x=>Number(typeof x==='number'?x:(x.netWorth??x.balance??x.value))).filter(Number.isFinite);if(vals.length<2)return;let lo=Math.min(...vals),hi=Math.max(...vals),pad=(hi-lo)*.1||1;ctx.strokeStyle='#20c982';ctx.lineWidth=2;ctx.beginPath();vals.forEach((v,i)=>{let x=i/(vals.length-1)*w,y=5+(hi+pad-v)/(hi-lo+2*pad)*(h-10);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}
 
 function renderMarketFeeds(){
  let evs=Object.entries(window.latestEvents||{}).map(([symbol,e])=>({symbol,...e})).filter(x=>x.type);

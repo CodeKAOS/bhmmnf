@@ -3,8 +3,6 @@ import base64, csv, hmac, io, json, os, shutil, sqlite3, threading, time, secret
 from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
-from html.parser import HTMLParser
-import re
 from urllib.request import Request, urlopen
 
 REMOTE=os.getenv('BITCOIN_HERO_API','https://bitcoinhero.me/api/prices')
@@ -17,85 +15,6 @@ SYMS=['BTC','ETH','SOL','DOGE','XRP','ADA','LINK','AVAX']
 BASE={'BTC': (67620.74, 102652.3283235368), 'ETH': (3360.5842984163146, 5640.140525), 'SOL': (654.08, 1299.19615215442), 'DOGE': (0.0437, 0.3305090875513101), 'XRP': (0.3017977083568663, 0.9173), 'ADA': (0.3401675692355668, 0.6635), 'LINK': (1.85625, 4.15), 'AVAX': (62.25, 167.0230490349094)}
 lock=threading.RLock(); runtime={'ok':False,'last_error':None,'last_poll':None,'tick_ms':3000}
 SESSIONS={}; SESSION_LOCK=threading.RLock(); SESSION_TTL=12*3600
-
-class _ProfileText(HTMLParser):
-    def __init__(self):
-        super().__init__(); self.parts=[]; self.scripts=[]; self._script=False; self._script_buf=[]
-    def handle_starttag(self, tag, attrs):
-        if tag == 'script': self._script=True; self._script_buf=[]
-    def handle_endtag(self, tag):
-        if tag == 'script' and self._script:
-            self.scripts.append(''.join(self._script_buf)); self._script=False
-    def handle_data(self, data):
-        value=data.strip()
-        if value:
-            self.parts.append(value)
-            if self._script: self._script_buf.append(data)
-
-def public_player_profile(username):
-    """Best-effort fallback for the public /u/<username> SSR profile."""
-    url='https://bitcoinhero.me/u/'+quote(username, safe='')
-    req=Request(url, headers={'User-Agent':'Mozilla/5.0 (compatible; BitcoinHeroTracker/23.1)'})
-    with urlopen(req, timeout=15) as response:
-        raw=response.read(3_000_000).decode('utf-8','replace')
-    parser=_ProfileText(); parser.feed(raw)
-    # Prefer embedded structured data when the public page exposes it.
-    for script in parser.scripts:
-        candidate=script.strip()
-        if not candidate or candidate[0] not in '[{': continue
-        try:
-            obj=json.loads(candidate)
-            if isinstance(obj,dict):
-                for key in ('player','profile','user'):
-                    if isinstance(obj.get(key),dict): return obj[key]
-                if any(k in obj for k in ('netWorth','net_worth','username')): return obj
-        except Exception: pass
-    text=' '.join(parser.parts)
-    def num(pattern):
-        m=re.search(pattern, text, re.I)
-        if not m: return None
-        try: return float(m.group(1).replace(',','').replace('$','').replace('%',''))
-        except Exception: return None
-    username_found=username
-    m=re.search(r'\b'+re.escape(username)+r'\b', text, re.I)
-    if not m: raise ValueError('Public profile page did not contain the requested player')
-    level=num(r'(?:Bronze|Silver|Gold|Platinum|Diamond)\s*[·•]\s*Level\s*(\d+)')
-    rank=num(r'Rank\s*#([\d,]+)\s*of\s*([\d,]+)')
-    total=num(r'Rank\s*#[\d,]+\s*of\s*([\d,]+)')
-    net=num(r'Net worth\s*\$([\d,]+(?:\.\d+)?)')
-    profit=num(r'([+-])\$([\d,]+(?:\.\d+)?)\s*\(([+-]?[\d,.]+)%\)\s*all time')
-    win=num(r'Win rate\s*([\d,.]+)%')
-    trades=num(r'Trades\s*([\d,]+)')
-    best=num(r'Best trade\s*\+?\$([\d,]+(?:\.\d+)?)')
-    month=num(r'This month\s*\+?\$([\d,]+(?:\.\d+)?)')
-    joined=None
-    jm=re.search(r'Trading since\s+(.+?)\s+·\s+Rank',text,re.I)
-    if jm: joined=jm.group(1).strip()
-    tier_match=re.search(r'\b(Bronze|Silver|Gold|Platinum|Diamond)\s*[·•]\s*Level\s*\d+',text,re.I)
-    tier=tier_match.group(1).lower() if tier_match else None
-    # Public page lists unlocked achievements; only names actually present are marked unlocked.
-    ach=[]; section=re.search(r'Achievements\s+(\d+)\s+of\s+(\d+)(.*?)(?:Bitcoin Hero\s*·|$)',text,re.I)
-    ach_total=int(section.group(2)) if section else None
-    if section:
-        chunk=section.group(3)
-        names=['First Trade','Bitcoin Believer','Diversified','Whale Move','Profit Taker','Day Trader','Trade Machine','In The Green']
-        for name in names:
-            if re.search(re.escape(name),chunk,re.I): ach.append({'name':name,'unlocked':True})
-    recent=[]
-    recent_chunk=re.search(r'Recent trades(.*?)(?:Achievements|$)',text,re.I)
-    if recent_chunk:
-        trade_re=r'\b([A-Z]{2,6})\s+\$([\d,]+(?:\.\d+)?)\s+[↑↓]?\s*(UP|DOWN)\s+([\w]+\s+ago)\s+([+-]?)\$([\d,]+(?:\.\d+)?)\s+([+-]?[\d,.]+)%'
-        for tm in re.finditer(trade_re,recent_chunk.group(1),re.I):
-            recent.append({'symbol':tm.group(1).upper(),'stake':float(tm.group(2).replace(',','')),'direction':tm.group(3).lower(),'pnl':float(tm.group(6).replace(',',''))*(-1 if tm.group(5)=='-' else 1),'timeAgo':tm.group(4),'pnlPercent':tm.group(7)})
-    out={'username':username_found,'netWorth':net,'rank':rank,'total':total,'trades':trades,'best':best,'month':month,'recent':recent,'achievements':ach,'achievementsTotal':ach_total,'source':'public_profile'}
-    if level is not None: out['level']={'level':int(level),'tier':tier}
-    if joined: out['createdAt']=joined
-    if win is not None: out['winRate']=win
-    if profit is not None:
-        out['profit']=float(profit.group(2).replace(',',''))*(-1 if profit.group(1)=='-' else 1)
-        if net is not None: out['startCash']=net-out['profit']
-    # A public page may not expose all trades or the curve in its HTML text; omit rather than fabricate.
-    return out
 
 def con():
     c=sqlite3.connect(DB, timeout=20); c.row_factory=sqlite3.Row
@@ -403,18 +322,8 @@ class Handler(SimpleHTTPRequestHandler):
         if u.path=='/api/player':
             q=parse_qs(u.query); username=(q.get('username') or [''])[0]
             if not username: return self.send_json({'error':'username required'},400)
-            try:
-                data=external_json('https://bitcoinhero.me/api/players/'+quote(username,safe=''))
-                if isinstance(data,dict) and any(k in data for k in ('netWorth','net_worth','curve','recent','trades')):
-                    data['_source']='api'; return self.send_json(data)
-                raise ValueError('Player API returned an incomplete profile')
-            except Exception as api_error:
-                try:
-                    fallback=public_player_profile(username)
-                    fallback['_source']='public_profile'
-                    return self.send_json(fallback)
-                except Exception as page_error:
-                    return self.send_json({'error':'Player profile unavailable','api_detail':str(api_error),'page_detail':str(page_error)},502)
+            try: return self.send_json(external_json('https://bitcoinhero.me/api/players/'+quote(username,safe='')))
+            except Exception as e: return self.send_json({'error':'Player profile unavailable','detail':str(e)},502)
         if u.path.startswith('/api/avatar/'):
             player_id=u.path.rsplit('/',1)[-1]
             if not player_id or len(player_id)>160: return self.send_json({'error':'invalid player id'},400)
@@ -436,5 +345,5 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__=='__main__':
     os.chdir(os.path.dirname(os.path.abspath(__file__))); init_db(); bootstrap_candles(); threading.Thread(target=collector,daemon=True).start()
-    print(f'Bitcoin Hero Northflank Tracker v23 on 0.0.0.0:{PORT}; DB={DB}')
+    print(f'Bitcoin Hero Northflank Tracker v24 on 0.0.0.0:{PORT}; DB={DB}')
     ThreadingHTTPServer((HOST,PORT),Handler).serve_forever()

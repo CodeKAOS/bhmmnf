@@ -31,3 +31,12 @@ Important:
 - Analytics use available stored price observations. Short-period changes and volatility become more meaningful as observations accumulate.
 - External API payload structures may vary. The frontend supports common array/object field shapes, but confirm activity, leaderboard and player fields against the live API after deployment.
 - This ZIP is not deployed automatically.
+
+
+V24 PLAYER PROFILE FIX
+- Public player profiles treat the public API's `achievements` array as the earned achievements list.
+- Displays the returned earned count against `achievementsTotal` (for example, Tacopilot: 13/16).
+- Shows the complete 16-achievement catalog; missing entries are shown as locked.
+- Uses the public profile's actual `level` object, `curve`, `recent`, `closed`, `wins`, `trades`, `best`, `month`, `netWorth`, `startCash`, `rank`, and `createdAt` fields.
+- Does not call the authenticated /api/users/{id}/achievements endpoint for public profiles.
+- Does not invent unlock dates.
